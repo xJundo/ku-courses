@@ -77,7 +77,58 @@ function getCollege(department: string) {
   return match ? match.college : 'Collège non identifié (vérifier sur sugang.korea.ac.kr)';
 }
 
-function computePreferenceTags(course: { COUR_NM: string; DEPARTMENT: string; MOOC_YN?: string; NEMO_YN?: string }) {
+// --------- Niveau de difficulté déduit du numéro de cours (1er chiffre du code : 2xx, 3xx, 4xx...) ---------
+function getDifficultyLevel(courCd: string): number | null {
+  const m = courCd.match(/(\d)\d*/);
+  if (!m) return null;
+  const level = parseInt(m[1], 10);
+  if (!level || level < 1) return null;
+  return level;
+}
+
+function getDifficultyLabel(level: number | null): string {
+  if (level === null) return 'Niveau indéterminé';
+  if (level === 1) return `Niveau 1 — Introductif`;
+  if (level === 2) return `Niveau 2 — Charge modérée`;
+  if (level === 3) return `Niveau 3 — Charge équivalente à une année Epitech`;
+  if (level === 4) return `Niveau 4 — Charge élevée`;
+  return `Niveau ${level} — Charge très élevée`;
+}
+
+function getDifficultyColor(level: number | null): string {
+  if (level === null) return 'bg-zinc-700';
+  if (level <= 2) return 'bg-emerald-500';
+  if (level === 3) return 'bg-amber-500';
+  if (level === 4) return 'bg-orange-500';
+  return 'bg-red-500';
+}
+
+function DifficultyScale({ level, compact }: { level: number | null; compact?: boolean }) {
+  const MAX_SEGMENTS = 5;
+  const filled = level ? Math.min(level, MAX_SEGMENTS) : 0;
+  const color = getDifficultyColor(level);
+
+  if (compact) {
+    return (
+      <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold text-white ${color}`}>
+        N{level ?? '?'}
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex items-center gap-0.5">
+        {Array.from({ length: MAX_SEGMENTS }).map((_, i) => (
+          <span key={i} className={`h-1.5 w-3.5 rounded-sm ${i < filled ? color : 'bg-zinc-700'}`} />
+        ))}
+      </div>
+      <span className="text-[10px] text-zinc-400">{getDifficultyLabel(level)}</span>
+    </div>
+  );
+}
+
+function computePreferenceTags(course: { COUR_NM: string; DEPARTMENT: string; MOOC_YN?: string; NEMO_YN?: string; EXCH_COR_YN?: string; LMT_YN?: string }) {
   const name = course.COUR_NM.toLowerCase();
   const dept = course.DEPARTMENT.toLowerCase();
 
@@ -89,6 +140,11 @@ function computePreferenceTags(course: { COUR_NM: string; DEPARTMENT: string; MO
   const softwareEasy = /department of computer software/.test(dept) || SOFTWARE_EASY_REGEX.test(name);
   const isOnline = course.MOOC_YN === '1' || course.NEMO_YN === '1';
 
+  // Colonnes "3) X : Exchange Student" et "2) L : Enrollment Limit" du site sugang.korea.ac.kr
+  // EXCH_COR_YN = '1' signifie une restriction pour les étudiants en échange (donc FERMÉ) ; '0' = ouvert.
+  const openToExchange = course.EXCH_COR_YN !== '1';
+  const seatsLimited = course.LMT_YN === '1';
+
   let score = 0;
   if (cyber) score -= 3;
   if (electronicsAvoid) score -= 2;
@@ -96,8 +152,9 @@ function computePreferenceTags(course: { COUR_NM: string; DEPARTMENT: string; MO
   if (robotics) score += 3;
   if (aiFit) score += 2;
   if (softwareEasy) score += 1;
+  if (!openToExchange) score -= 5;
 
-  return { cyber, robotics, electronicsAvoid, mathHeavy, aiFit, softwareEasy, isOnline, score };
+  return { cyber, robotics, electronicsAvoid, mathHeavy, aiFit, softwareEasy, isOnline, openToExchange, seatsLimited, score };
 }
 
 const CATEGORY_LABELS: Record<Category, string> = {
@@ -178,6 +235,8 @@ function normalizeRow(row: any) {
   const time = getInsensitiveKey(row, 'TIME') || '';
   const mooc = getInsensitiveKey(row, 'MOOC_YN') || '0';
   const nemo = getInsensitiveKey(row, 'NEMO_YN') || '0';
+  const exchOk = getInsensitiveKey(row, 'EXCH_COR_YN') || '0';
+  const lmt = getInsensitiveKey(row, 'LMT_YN') || '0';
 
   return {
     COUR_CD: String(rawCode).trim(),
@@ -189,7 +248,9 @@ function normalizeRow(row: any) {
     COUR_CLS: String(cls).trim(),
     TIME: String(time).trim(),
     MOOC_YN: String(mooc).trim(),
-    NEMO_YN: String(nemo).trim()
+    NEMO_YN: String(nemo).trim(),
+    EXCH_COR_YN: String(exchOk).trim(),
+    LMT_YN: String(lmt).trim()
   };
 }
 
@@ -395,6 +456,7 @@ export default function App() {
   const [optimizeInfo, setOptimizeInfo] = useState<string | null>(null);
 
   const [showCustomModal, setShowCustomModal] = useState(false);
+  const [detailsCourse, setDetailsCourse] = useState<any>(null);
   const [customCourse, setCustomCourse] = useState({
     COUR_CD: '', COUR_NM: '', CREDIT: '3', PROF_NM: '', DEPARTMENT: '',
     COUR_CLS: '00', DAY: 'Mon', START_PERIOD: '1', END_PERIOD: '2', ROOM: ''
@@ -473,6 +535,7 @@ export default function App() {
       ...c,
       category: getEffectiveCategory(c),
       college: getCollege(c.DEPARTMENT),
+      difficultyLevel: getDifficultyLevel(c.COUR_CD),
       parsedSchedules: parseSchedule(c.TIME_ROOM),
       creditsNum: parseFloat(c.CREDIT) || 0,
       ...computePreferenceTags(c)
@@ -512,7 +575,9 @@ export default function App() {
       businessCount: 0,
       othersCount: 0,
       activeDays: new Set<string>(),
-      hasConflict: false
+      hasConflict: false,
+      nonExchangeCourses: [] as any[],
+      limitedSeatsCourses: [] as any[]
     };
 
     const occupiedSlots: Record<string, any> = {};
@@ -523,6 +588,8 @@ export default function App() {
       if (c.category === 'IT') stats.itCount++;
       if (c.category === 'BUSINESS') stats.businessCount++;
       if (c.category === 'OTHERS') stats.othersCount++;
+      if (!c.openToExchange) stats.nonExchangeCourses.push(c);
+      if (c.seatsLimited) stats.limitedSeatsCourses.push(c);
 
       c.parsedSchedules.forEach((sched: any) => {
         if (!c.isOnline) stats.activeDays.add(sched.day);
@@ -543,22 +610,26 @@ export default function App() {
     const ruleMet = itCount >= 3 && businessCount >= 1 && koreanCount >= 1;
     const creditsMet = totalCredits >= 15;
     const daysMet = activeDays.size <= 4 && activeDays.size > 0;
+    const exchangeMet = selectedStats.nonExchangeCourses.length === 0;
 
     return {
       ruleMet,
       creditsMet,
       daysMet,
-      isValidOverall: ruleMet && creditsMet && daysMet && !selectedStats.hasConflict
+      exchangeMet,
+      isValidOverall: ruleMet && creditsMet && daysMet && exchangeMet && !selectedStats.hasConflict
     };
   }, [selectedStats]);
 
   const handleAutoOptimize = () => {
-    const it = coursesWithSchedules.filter(c => c.category === 'IT');
-    const business = coursesWithSchedules.filter(c => c.category === 'BUSINESS');
-    const korean = coursesWithSchedules.filter(c => c.category === 'KOREAN');
+    // Colonne "X" du site sugang : un cours non coché ne peut pas être pris par un étudiant en échange,
+    // donc on l'exclut d'emblée de la recherche automatique.
+    const it = coursesWithSchedules.filter(c => c.category === 'IT' && c.openToExchange);
+    const business = coursesWithSchedules.filter(c => c.category === 'BUSINESS' && c.openToExchange);
+    const korean = coursesWithSchedules.filter(c => c.category === 'KOREAN' && c.openToExchange);
 
     if (korean.length === 0 || business.length === 0 || it.length < 3) {
-      setJsonError('Catalogue trop restreint pour générer une combinaison (il faut au moins 1 Coréen, 1 Business et 3 IT). Vérifiez les catégories via le badge cliquable sur chaque carte.');
+      setJsonError("Pas assez de cours ouverts aux échanges (colonne X) dans ces catégories pour générer une combinaison (il faut au moins 1 Coréen, 1 Business et 3 IT marqués OUVERT). Vérifiez les catégories via le badge cliquable sur chaque carte, ou composez manuellement.");
       setOptimizeInfo(null);
       return;
     }
@@ -770,17 +841,43 @@ export default function App() {
                   <div><span className="font-semibold">Conflit détecté :</span> deux cours sélectionnés se chevauchent.</div>
                 </div>
               )}
+
+              {selectedStats.nonExchangeCourses.length > 0 && (
+                <div className="bg-red-950/60 border-2 border-red-600 text-red-200 p-4 rounded-xl flex items-start gap-3 text-xs">
+                  <AlertTriangle className="h-6 w-6 text-red-400 shrink-0 animate-pulse" />
+                  <div>
+                    <p className="font-bold text-sm text-red-300">Cours fermé aux étudiants en échange</p>
+                    <p className="mt-1 leading-relaxed">
+                      Sur sugang.korea.ac.kr, ces cours n'ont pas la case <strong>"3) X : Exchange Student"</strong> cochée — vous ne pourrez probablement <strong>pas vous y inscrire</strong> :
+                    </p>
+                    <ul className="mt-1.5 space-y-0.5 list-disc list-inside">
+                      {selectedStats.nonExchangeCourses.map((c: any, i: number) => (
+                        <li key={i}><span className="font-mono font-bold">{c.COUR_CD}-{c.COUR_CLS}</span> — {c.COUR_NM}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {selectedStats.limitedSeatsCourses.length > 0 && (
+                <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 p-3 rounded-xl flex items-start gap-2 text-xs">
+                  <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold">Places limitées (colonne "2) L") :</span> {selectedStats.limitedSeatsCourses.length} cours sélectionné(s) ont un nombre de places restreint — inscrivez-vous en priorité dès l'ouverture de sugang.korea.ac.kr.
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className={`p-4 rounded-2xl border text-center ${validationDetails.isValidOverall ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-zinc-800/50 border-zinc-800 text-zinc-400'}`}>
               {validationDetails.isValidOverall ? (
                 <div className="flex flex-col items-center gap-1">
-                  <span className="text-sm font-bold">🎉 Emploi du temps éligible !</span>
+                  <span className="text-sm font-bold">Emploi du temps éligible</span>
                   <span className="text-xs">15 crédits mini, ≤ 4 jours, 3 IT + 1 Business + 1 Coréen, sans conflit.</span>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-1">
-                  <span className="text-sm font-semibold">📋 En attente de validation</span>
+                  <span className="text-sm font-semibold">En attente de validation</span>
                   <span className="text-xs">Ajustez votre sélection pour respecter tous les critères.</span>
                 </div>
               )}
@@ -793,11 +890,12 @@ export default function App() {
               <span>Aide</span>
             </h3>
             <div className="text-xs text-zinc-400 space-y-2">
-              <p>🏷️ <strong>Catégorie auto-détectée</strong> par département (IT / Business / Coréen / Autre). Si un cours est mal classé, cliquez sur son badge de catégorie pour le corriger manuellement.</p>
-              <p>🎯 <strong>Affinités perso</strong> (badges sur chaque carte) : 🤖 Robotique et 🧠 IA sont priorisés par "Optimisation Auto", 🔒 Cyber / ⚡ Électronique / ➗ Maths sont évités, 💻 Software = votre branche (facile).</p>
-              <p>🌐 <strong>Visio (MOOC/NEMO)</strong> : ces cours ne comptent pas dans la limite de jours, vous pouvez les ajouter librement.</p>
-              <p>🏢 <strong>Salles</strong> : le code de salle indique d'abord le bâtiment puis la salle (ex : 35-322).</p>
-              <p>📄 Le catalogue chargé par défaut est le fichier <code>public/courses.json</code> (tout Sejong, semestre d'automne 2026). Vous pouvez le remplacer via "Charger Fichier".</p>
+              <p><strong>Catégorie auto-détectée</strong> par département (IT / Business / Coréen / Autre). Si un cours est mal classé, cliquez sur son badge de catégorie pour le corriger manuellement.</p>
+              <p><strong>Difficulté</strong> : déduite du 1er chiffre du numéro de cours (2xx = Niveau 2, 3xx = Niveau 3, 4xx = Niveau 4...). Niveau 3 ≈ charge d'une année Epitech classique, au-delà c'est plus lourd.</p>
+              <p><strong>Affinités perso</strong> (badges sur chaque carte) : ROBOTIQUE et IA sont priorisés par "Optimisation Auto", CYBER / ÉLECTRONIQUE / MATHS sont évités, SOFTWARE = votre branche (facile).</p>
+              <p><strong>Visio (MOOC/NEMO)</strong> : ces cours ne comptent pas dans la limite de jours, vous pouvez les ajouter librement.</p>
+              <p><strong>Salles</strong> : le code de salle indique d'abord le bâtiment puis la salle (ex : 35-322).</p>
+              <p>Le catalogue chargé par défaut est le fichier <code>public/courses.json</code> (tout Sejong, semestre d'automne 2026). Vous pouvez le remplacer via "Charger Fichier".</p>
             </div>
           </div>
         </div>
@@ -843,17 +941,28 @@ export default function App() {
                         const hasConflict = coursesAtThisSlot.length > 1;
 
                         return (
-                          <td key={day} className={`p-1.5 border-l border-zinc-800/30 relative min-h-[48px] ${hasConflict ? 'bg-red-950/15' : ''}`}>
+                          <td key={day} className={`p-1.5 border-l border-zinc-800/30 relative min-h-[92px] align-top ${hasConflict ? 'bg-red-950/15' : ''}`}>
                             {coursesAtThisSlot.map((course, cIdx) => (
                               <div
                                 key={cIdx}
                                 title={`${course.COUR_NM} (${course.COUR_CD})\n${course.college}\n${course.DEPARTMENT}`}
-                                className={`rounded-xl p-2 border text-[10px] leading-tight flex flex-col justify-between h-full shadow cursor-pointer transition ${categoryColors[course.category as Category]?.grid || 'bg-zinc-800'} ${hasConflict ? 'ring-2 ring-red-500' : ''}`}
-                                onClick={() => toggleCourse(course)}
+                                className={`rounded-xl p-2 border text-[10px] leading-tight flex flex-col justify-between h-full shadow cursor-pointer transition ${categoryColors[course.category as Category]?.grid || 'bg-zinc-800'} ${hasConflict ? 'ring-2 ring-red-500' : ''} ${!course.openToExchange ? 'ring-1 ring-red-600' : ''}`}
+                                onClick={() => setDetailsCourse(course)}
                               >
-                                <div className="font-bold line-clamp-1">{course.COUR_CD}</div>
-                                <div className="text-[9px] font-normal opacity-80 truncate">{course.COUR_NM}</div>
-                                <div className="flex items-center justify-between mt-1 text-[8px] opacity-70">
+                                <div>
+                                  <div className="font-bold line-clamp-1">{course.COUR_CD}</div>
+                                  <div className="text-[9px] font-normal opacity-80 truncate">{course.COUR_NM}</div>
+                                </div>
+
+                                <div className="flex items-center gap-1 flex-wrap my-1">
+                                  <span className={`text-[8px] px-1 rounded font-bold text-white ${course.openToExchange ? 'bg-emerald-600' : 'bg-red-600'}`}>
+                                    {course.openToExchange ? 'OUVERT' : 'FERMÉ'}
+                                  </span>
+                                  <DifficultyScale level={course.difficultyLevel} compact />
+                                  {course.seatsLimited && <span className="text-[8px] px-1 rounded font-bold text-white bg-amber-600">LIMITÉ</span>}
+                                </div>
+
+                                <div className="flex items-center justify-between text-[8px] opacity-70">
                                   <span className="truncate">{course.PROF_NM || 'N/A'}</span>
                                   <span className="font-mono bg-black/25 px-1 rounded">
                                     {course.parsedSchedules.find((s: any) => s.day === day)?.room || 'N/A'}
@@ -915,7 +1024,7 @@ export default function App() {
                   return (
                     <div
                       key={idx}
-                      className={`border rounded-2xl p-4 flex flex-col justify-between gap-4 transition duration-150 ${isSelected ? 'bg-zinc-800/50 border-violet-500 shadow-md' : 'bg-zinc-950/30 border-zinc-800/80 hover:border-zinc-700'}`}
+                      className={`border rounded-2xl p-4 flex flex-col justify-between gap-4 transition duration-150 ${isSelected ? 'bg-zinc-800/50 border-violet-500 shadow-md' : 'bg-zinc-950/30 border-zinc-800/80 hover:border-zinc-700'} ${!course.openToExchange ? 'ring-1 ring-red-600/40' : ''}`}
                     >
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-between">
@@ -965,17 +1074,44 @@ export default function App() {
                           </div>
                         </div>
 
-                        {(course.robotics || course.aiFit || course.softwareEasy || course.cyber || course.electronicsAvoid || course.mathHeavy || course.isOnline) && (
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {course.robotics && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-fuchsia-500/10 border border-fuchsia-500/20 text-fuchsia-300">🤖 Robotique</span>}
-                            {course.aiFit && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">🧠 IA</span>}
-                            {course.softwareEasy && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-300">💻 Software</span>}
-                            {course.isOnline && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300">🌐 Visio</span>}
-                            {course.cyber && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-300">🔒 Cyber</span>}
-                            {course.electronicsAvoid && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-300">⚡ Électronique</span>}
-                            {course.mathHeavy && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-300">➗ Maths</span>}
+                        <div className="border-t border-zinc-800/80 mt-2 pt-2 flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wide">Difficulté</span>
+                            <DifficultyScale level={course.difficultyLevel} />
                           </div>
-                        )}
+
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wide">Échange (X)</span>
+                            <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${course.openToExchange ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/50'}`}>
+                              {course.openToExchange ? 'OUVERT' : 'FERMÉ'}
+                            </span>
+                          </div>
+
+                          {course.seatsLimited && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wide">Places (L)</span>
+                              <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">LIMITÉES</span>
+                            </div>
+                          )}
+
+                          {course.isOnline && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wide">Format</span>
+                              <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">VISIO (MOOC/NEMO)</span>
+                            </div>
+                          )}
+
+                          {(course.robotics || course.aiFit || course.softwareEasy || course.cyber || course.electronicsAvoid || course.mathHeavy) && (
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {course.robotics && <span className="text-[9px] px-1.5 py-0.5 rounded border border-fuchsia-500/30 text-fuchsia-300 bg-fuchsia-500/10 font-semibold">ROBOTIQUE</span>}
+                              {course.aiFit && <span className="text-[9px] px-1.5 py-0.5 rounded border border-indigo-500/30 text-indigo-300 bg-indigo-500/10 font-semibold">IA</span>}
+                              {course.softwareEasy && <span className="text-[9px] px-1.5 py-0.5 rounded border border-sky-500/30 text-sky-300 bg-sky-500/10 font-semibold">SOFTWARE</span>}
+                              {course.cyber && <span className="text-[9px] px-1.5 py-0.5 rounded border border-red-500/30 text-red-300 bg-red-500/10 font-semibold">CYBER</span>}
+                              {course.electronicsAvoid && <span className="text-[9px] px-1.5 py-0.5 rounded border border-orange-500/30 text-orange-300 bg-orange-500/10 font-semibold">ÉLECTRONIQUE</span>}
+                              {course.mathHeavy && <span className="text-[9px] px-1.5 py-0.5 rounded border border-orange-500/30 text-orange-300 bg-orange-500/10 font-semibold">MATHS</span>}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
                       <button
@@ -997,6 +1133,104 @@ export default function App() {
           </div>
         </div>
       </main>
+
+      {detailsCourse && (
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setDetailsCourse(null)}>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-zinc-850 pb-3 mb-4">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4 text-violet-400" />
+                <span>Détails du cours</span>
+              </h3>
+              <button onClick={() => setDetailsCourse(null)} className="text-zinc-400 hover:text-zinc-200 transition">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-mono font-bold text-zinc-300 text-sm">{detailsCourse.COUR_CD}-{detailsCourse.COUR_CLS}</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${categoryColors[detailsCourse.category as Category]?.bg}`}>
+                  {CATEGORY_LABELS[detailsCourse.category as Category]}
+                </span>
+              </div>
+
+              <h4 className="text-sm font-bold text-white">{detailsCourse.COUR_NM}</h4>
+
+              <div className="flex flex-col gap-1.5 text-zinc-400">
+                <div className="flex items-start gap-1.5">
+                  <span className="text-zinc-600 font-medium shrink-0">Collège :</span>
+                  <span className="text-zinc-300 leading-tight">{detailsCourse.college}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-zinc-600 font-medium">Dépt :</span>
+                  <span className="text-zinc-300">{detailsCourse.DEPARTMENT || 'N/A'}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-zinc-600 font-medium">Prof :</span>
+                  <span className="text-zinc-300">{detailsCourse.PROF_NM || 'Non spécifié'}</span>
+                </div>
+                <div className="flex items-start gap-1.5">
+                  <span className="text-zinc-600 font-medium shrink-0">Horaires :</span>
+                  {detailsCourse.parsedSchedules.length > 0 ? (
+                    <div className="flex flex-col gap-0.5">
+                      {detailsCourse.parsedSchedules.map((s: any, sIdx: number) => (
+                        <span key={sIdx} className="text-zinc-300 leading-tight">
+                          <span className="text-zinc-100 font-semibold">{DAYS_FR[s.day] || s.day}</span>
+                          {' '}P{s.periods.join('-')} · {s.room || 'N/A'}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-zinc-500 italic">Non planifié</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-zinc-600 font-medium">Crédits :</span>
+                  <span className="text-zinc-300">{detailsCourse.CREDIT}</span>
+                </div>
+              </div>
+
+              <div className="border-t border-zinc-800 pt-3 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wide">Difficulté</span>
+                  <DifficultyScale level={detailsCourse.difficultyLevel} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wide">Échange (X)</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${detailsCourse.openToExchange ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/20 text-red-300 border border-red-500/50'}`}>
+                    {detailsCourse.openToExchange ? 'OUVERT' : 'FERMÉ'}
+                  </span>
+                </div>
+                {detailsCourse.seatsLimited && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wide">Places (L)</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">LIMITÉES</span>
+                  </div>
+                )}
+                {(detailsCourse.robotics || detailsCourse.aiFit || detailsCourse.softwareEasy || detailsCourse.cyber || detailsCourse.electronicsAvoid || detailsCourse.mathHeavy) && (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {detailsCourse.robotics && <span className="text-[9px] px-1.5 py-0.5 rounded border border-fuchsia-500/30 text-fuchsia-300 bg-fuchsia-500/10 font-semibold">ROBOTIQUE</span>}
+                    {detailsCourse.aiFit && <span className="text-[9px] px-1.5 py-0.5 rounded border border-indigo-500/30 text-indigo-300 bg-indigo-500/10 font-semibold">IA</span>}
+                    {detailsCourse.softwareEasy && <span className="text-[9px] px-1.5 py-0.5 rounded border border-sky-500/30 text-sky-300 bg-sky-500/10 font-semibold">SOFTWARE</span>}
+                    {detailsCourse.cyber && <span className="text-[9px] px-1.5 py-0.5 rounded border border-red-500/30 text-red-300 bg-red-500/10 font-semibold">CYBER</span>}
+                    {detailsCourse.electronicsAvoid && <span className="text-[9px] px-1.5 py-0.5 rounded border border-orange-500/30 text-orange-300 bg-orange-500/10 font-semibold">ÉLECTRONIQUE</span>}
+                    {detailsCourse.mathHeavy && <span className="text-[9px] px-1.5 py-0.5 rounded border border-orange-500/30 text-orange-300 bg-orange-500/10 font-semibold">MATHS</span>}
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => { toggleCourse(detailsCourse); setDetailsCourse(null); }}
+                className="w-full py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 mt-1"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Supprimer de l'emploi du temps</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showCustomModal && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4">

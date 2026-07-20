@@ -1,0 +1,168 @@
+{
+  "DIGB241-00 (Digital Marketing)": [
+    {
+      "course": "DIGB241-00",
+      "title": "DIGITAL MARKETING(English)",
+      "time_room": "Mon(6-7) 33-424 / Tue(7) 33-424",
+      "credit": "3",
+      "department": "Digital Business in Division of Convergence Business",
+      "professor": "Li, Yiling"
+    }
+  ],
+  "GLOB201-01/02 (Organizational Behavior)": [
+    {
+      "course": "GLOB201-01",
+      "title": "ORGANIZATIONAL BEHAVIOR",
+      "time_room": "Mon(2) 33-423 / Wed(9-10) ",
+      "credit": "3",
+      "department": "Global Business in Division of Convergence Business",
+      "professor": "Choi Suk Bong"
+    },
+    {
+      "course": "GLOB201-02",
+      "title": "ORGANIZATIONAL BEHAVIOR(English)",
+      "time_room": "Tuesday(2) 33-426 / Wednesday(1-2) ",
+      "credit": "3",
+      "department": "Global Business in Division of Convergence Business",
+      "professor": "Lee, Soojin"
+    },
+    {
+      "course": "GLOB201-03",
+      "title": "ORGANIZATIONAL BEHAVIOR",
+      "time_room": "Fri(6-8) 33-425",
+      "credit": "3",
+      "department": "Global Business in Division of Convergence Business",
+      "professor": "KWON, HYEOKNAM"
+    },
+    {
+      "course": "GLOB201-04",
+      "title": "ORGANIZATIONAL BEHAVIOR",
+      "time_room": "Wed(1-3) 33-425",
+      "credit": "3",
+      "department": "Global Business in Division of Convergence Business",
+      "professor": ""
+    }
+  ],
+  "SLSC221 (Korean for Beginners I)": [
+    {
+      "course": "SLSC221-00",
+      "title": "KOREAN FOR BEGINNERSⅠ",
+      "time_room": "Wed(3) 25-520 / Fri(2-3) 25-408",
+      "credit": "3",
+      "department": "Institute for General Education",
+      "professor": ""
+    }
+  ],
+  "DCCS201 / EIEN233 -> Data Structure": [
+    {
+      "course": "DCSS201-00",
+      "title": "DATA STRUCTURE(English)",
+      "time_room": "Wed(3) 7-324 / Fri(5-6) 7-324",
+      "credit": "3",
+      "department": "Department of Computer Software",
+      "professor": "Chung, In Jeong"
+    }
+  ],
+  "DCCS203 -> Digital System(s)": [
+    {
+      "course": "EIEN220-01",
+      "title": "DIGITAL SYSTEMS(English)",
+      "time_room": "Tuesday(4) 9-234 / Wednesday(7-8) 35-323",
+      "credit": "3",
+      "department": "Department of Electronics and Information Engineering",
+      "professor": "Shin, Donghoon"
+    },
+    {
+      "course": "EIEN220-02",
+      "title": "DIGITAL SYSTEMS",
+      "time_room": "Wed(7-8) 38-114 / Thu(6) 35-323",
+      "credit": "3",
+      "department": "Department of Electronics and Information Engineering",
+      "professor": "Sang Kon Kim"
+    },
+    {
+      "course": "EIEN220-03",
+      "title": "DIGITAL SYSTEMS",
+      "time_room": "Wed(4-5) 38-114 / Fri(3) 35-323",
+      "credit": "3",
+      "department": "Department of Electronics and Information Engineering",
+      "professor": "Sang Kon Kim"
+    }
+  ],
+  "DSSP345 -> Electric Circuit Lab": [
+    {
+      "course": "EIEN232-01",
+      "title": "ELECTRIC CIRCUIT LAB",
+      "time_room": "Mon(9-11) 35-424",
+      "credit": "1",
+      "department": "Department of Electronics and Information Engineering",
+      "professor": "Seo, Sungkyu"
+    },
+    {
+      "course": "EIEN232-02",
+      "title": "ELECTRIC CIRCUIT LAB",
+      "time_room": "Tue(9-11) 35-424",
+      "credit": "1",
+      "department": "Department of Electronics and Information Engineering",
+      "professor": "Seo, Sungkyu"
+    },
+    {
+      "course": "EIEN232-03",
+      "title": "ELECTRIC CIRCUIT LAB",
+      "time_room": "Wednesday(9-11) 35-424",
+      "credit": "1",
+      "department": "Department of Electronics and Information Engineering",
+      "professor": "Seo, Sungkyu"
+    },
+    {
+      "course": "EIEN232-04",
+      "title": "ELECTRIC CIRCUIT LAB",
+      "time_room": "Thu(9-11) 35-424",
+      "credit": "1",
+      "department": "Department of Electronics and Information Engineering",
+      "professor": "Seo, Sungkyu"
+    },
+    {
+      "course": "EIEN232-05",
+      "title": "ELECTRIC CIRCUIT LAB",
+      "time_room": "Mon(6-8) 35-424",
+      "credit": "1",
+      "department": "Department of Electronics and Information Engineering",
+      "professor": "Seo, Sungkyu"
+    }
+  ],
+  "EMSE351 -> Signals and Systems I": [
+    {
+      "course": "EIEN224-01",
+      "title": "SIGNALS AND SYSTEMS I(English)",
+      "time_room": "Monday(6) 9-535 / Tuesday(5-6) 과학기술1관 210C호",
+      "credit": "3",
+      "department": "Department of Electronics and Information Engineering",
+      "professor": "KIM, Tae Kon"
+    },
+    {
+      "course": "EIEN224-02",
+      "title": "SIGNALS AND SYSTEMS I(English)",
+      "time_room": "Mon(6) 38-114 / Tue(5-6) 9-234",
+      "credit": "3",
+      "department": "Department of Electronics and Information Engineering",
+      "professor": "Kim Sung Hoon"
+    },
+    {
+      "course": "EIEN224-03",
+      "title": "SIGNALS AND SYSTEMS I(English)",
+      "time_room": "Mon(6) 35-323 / Thu(4-5) 35-323",
+      "credit": "3",
+      "department": "Department of Electronics and Information Engineering",
+      "professor": "Lee, Ki-Hun"
+    },
+    {
+      "course": "EIEN224-04",
+      "title": "SIGNALS AND SYSTEMS I(English)",
+      "time_room": "Tuesday(5-6) 25-409 / Thursday(5) 9-535",
+      "credit": "3",
+      "department": "Department of Electronics and Information Engineering",
+      "professor": "Oh Chang Hyun"
+    }
+  ]
+}

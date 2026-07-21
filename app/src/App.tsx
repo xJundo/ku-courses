@@ -16,14 +16,20 @@ import {
   Clipboard,
   PlusCircle,
   Tag,
-  Loader2
+  Loader2,
+  Star,
+  MessageSquare,
+  Download,
+  ArrowUpDown,
+  FileJson,
+  ChevronDown,
+  FolderOpen
 } from 'lucide-react';
 
 // ----------------------------------------------------------------------------------
 // Contrainte réelle : accès à TOUS les collèges de KU Sejong.
-// Il n'y a donc plus de liste de codes "approuvés" à filtrer : on charge le
-// catalogue complet et on classe chaque cours par mot-clé de département.
-// Seule règle imposée par l'utilisateur : 3 cours IT + 1 cours Business + 1 cours Coréen.
+// Catalogue complet et classement de chaque cours par mot-clé de département.
+// Règle imposée par l'utilisateur : 3 cours IT + 1 cours Business + 1 cours Coréen.
 // ----------------------------------------------------------------------------------
 
 type Category = 'IT' | 'BUSINESS' | 'KOREAN' | 'OTHERS';
@@ -41,9 +47,6 @@ const AI_FIT_REGEX = /artificial intelligence|deep learning|machine learning|neu
 const SOFTWARE_EASY_REGEX = /programming|software|data structure|algorithm|database|operating system|compiler/i;
 
 // --------- Collège (Sejong Campus) déduit du département ---------
-// Le champ COL_CD renvoyé par l'API est une constante inutilisable ("9999"),
-// donc on retrouve le collège via le nom de département, d'après le tableau
-// officiel "Fields of Study (Sejong Campus)" fourni par Epitech/KU.
 const COLLEGE_RULES: { college: string; regex: RegExp }[] = [
   {
     college: 'Collège des Sciences & Technologies (College of Science & Technology)',
@@ -128,6 +131,73 @@ function DifficultyScale({ level, compact }: { level: number | null; compact?: b
   );
 }
 
+// --------- Composant pour l'évaluation en 5 étoiles ---------
+function StarRating({
+  rating,
+  onRate,
+  interactive = true,
+  size = 'sm'
+}: {
+  rating: number;
+  onRate?: (r: number) => void;
+  interactive?: boolean;
+  size?: 'sm' | 'md';
+}) {
+  const starSize = size === 'sm' ? 'h-3.5 w-3.5' : 'h-5 w-5';
+  return (
+    <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
+      {[1, 2, 3, 4, 5].map(star => (
+        <button
+          key={star}
+          type="button"
+          disabled={!interactive}
+          onClick={() => onRate && onRate(star === rating ? 0 : star)}
+          className={`${interactive ? 'hover:scale-125 transition-transform p-0.5 focus:outline-none' : 'cursor-default'}`}
+          title={interactive ? (star === rating ? 'Supprimer la note' : `${star} étoile${star > 1 ? 's' : ''}`) : `${rating}/5 étoiles`}
+        >
+          <Star
+            className={`${starSize} ${
+              star <= rating
+                ? 'text-amber-400 fill-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.5)]'
+                : 'text-zinc-600 hover:text-amber-300'
+            }`}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// --------- Éditeur de commentaire optimisé (évite les lags à la frappe) ---------
+function CommentEditor({
+  initialComment,
+  onSave
+}: {
+  initialComment: string;
+  onSave: (comment: string) => void;
+}) {
+  const [val, setVal] = useState(initialComment);
+
+  useEffect(() => {
+    setVal(initialComment);
+  }, [initialComment]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const text = e.target.value;
+    setVal(text);
+    onSave(text);
+  };
+
+  return (
+    <textarea
+      value={val}
+      onChange={handleChange}
+      placeholder="Ajoutez vos remarques, avis d'anciens étudiants, ou notes personnelles sur ce cours..."
+      className="w-full bg-zinc-950 text-xs p-3 rounded-2xl border border-zinc-800 text-zinc-100 focus:outline-none focus:border-violet-500 h-28 resize-none leading-relaxed"
+    />
+  );
+}
+
 function computePreferenceTags(course: { COUR_NM: string; DEPARTMENT: string; MOOC_YN?: string; NEMO_YN?: string; EXCH_COR_YN?: string; LMT_YN?: string }) {
   const name = course.COUR_NM.toLowerCase();
   const dept = course.DEPARTMENT.toLowerCase();
@@ -140,8 +210,6 @@ function computePreferenceTags(course: { COUR_NM: string; DEPARTMENT: string; MO
   const softwareEasy = /department of computer software/.test(dept) || SOFTWARE_EASY_REGEX.test(name);
   const isOnline = course.MOOC_YN === '1' || course.NEMO_YN === '1';
 
-  // Colonnes "3) X : Exchange Student" et "2) L : Enrollment Limit" du site sugang.korea.ac.kr
-  // EXCH_COR_YN = '1' signifie une restriction pour les étudiants en échange (donc FERMÉ) ; '0' = ouvert.
   const openToExchange = course.EXCH_COR_YN !== '1';
   const seatsLimited = course.LMT_YN === '1';
 
@@ -166,7 +234,6 @@ const CATEGORY_LABELS: Record<Category, string> = {
 
 const CATEGORY_ORDER: Category[] = ['IT', 'BUSINESS', 'KOREAN', 'OTHERS'];
 
-// Petit jeu de secours si /courses.json n'a pas pu être chargé
 const FALLBACK_COURSES = [
   {
     COUR_CD: 'SLSC221', COUR_NM: 'KOREAN FOR BEGINNERS I', CREDIT: '3',
@@ -262,7 +329,7 @@ function processJsonPayload(rawText: string) {
     try {
       cleanText = '[' + cleanText.replace(/}\s*\n*\s*{/g, '},{') + ']';
     } catch {
-      // ignore, will fail JSON.parse below with a clear error
+      // ignore
     }
   }
 
@@ -345,7 +412,6 @@ function slotsConflict(a: { parsedSchedules: { day: string; periods: number[] }[
   return false;
 }
 
-// Jours "présentiel" d'un cours : un cours MOOC/NEMO (visio) ne compte pour aucun jour.
 function inPersonDays(course: { parsedSchedules: { day: string }[]; isOnline?: boolean }) {
   if (course.isOnline) return new Set<string>();
   return new Set(course.parsedSchedules.map(sc => sc.day));
@@ -357,16 +423,12 @@ function unionInPersonDays(courses: { parsedSchedules: { day: string }[]; isOnli
   return s;
 }
 
-// Un cours en ligne (MOOC/NEMO) n'est jamais contraint par les jours autorisés.
 function withinAllowedDays(course: { parsedSchedules: { day: string }[]; isOnline?: boolean }, allowedDays: Set<string> | null) {
   if (!allowedDays) return true;
   if (course.isOnline) return true;
   return course.parsedSchedules.every(sc => allowedDays.has(sc.day));
 }
 
-// Recherche d'une combinaison valide : 1 Coréen + 1 Business + 3 IT, sans conflit,
-// contrainte aux `allowedDays` (sauf cours en ligne), en priorisant les cours IT
-// au score de préférence le plus élevé (robotique/IA d'abord, cyber/électronique/maths évités).
 function findValidCombo(itList: any[], businessList: any[], koreanList: any[], allowedDays: Set<string> | null, maxDays: number) {
   const BUDGET = 500000;
   const POOL_CAP = 50;
@@ -376,7 +438,6 @@ function findValidCombo(itList: any[], businessList: any[], koreanList: any[], a
   const businessFiltered = businessList.filter(c => withinAllowedDays(c, allowedDays));
   const koreanFiltered = koreanList.filter(c => withinAllowedDays(c, allowedDays));
 
-  // Cours IT les mieux notés en premier (préférences : robotique > IA > software, cyber/électronique/maths pénalisés)
   const itSorted = [...itFiltered].sort((a, b) => (b.score || 0) - (a.score || 0));
 
   for (const k of koreanFiltered) {
@@ -441,13 +502,36 @@ function findValidCombo(itList: any[], businessList: any[], koreanList: any[], a
   return null;
 }
 
+// Utilitaires LocalStorage
+const loadLocalStorage = <T,>(key: string, defaultValue: T): T => {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : defaultValue;
+  } catch {
+    return defaultValue;
+  }
+};
+
+const saveLocalStorage = (key: string, value: any) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore
+  }
+};
+
 export default function App() {
   const [courses, setCourses] = useState<any[]>(FALLBACK_COURSES);
   const [selectedCourses, setSelectedCourses] = useState<any[]>([]);
-  const [categoryOverrides, setCategoryOverrides] = useState<Record<string, Category>>({});
+  const [categoryOverrides, setCategoryOverrides] = useState<Record<string, Category>>(() => loadLocalStorage('ku_cat_overrides', {}));
+  const [ratings, setRatings] = useState<Record<string, number>>(() => loadLocalStorage('ku_ratings', {}));
+  const [comments, setComments] = useState<Record<string, string>>(() => loadLocalStorage('ku_comments', {}));
+  const [customCourses, setCustomCourses] = useState<any[]>(() => loadLocalStorage('ku_custom_courses', []));
+
   const [searchTerm, setSearchTerm] = useState('');
   const [showClosedExchange, setShowClosedExchange] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
+  const [sortBy, setSortBy] = useState<'default' | 'rating-desc' | 'rating-asc' | 'code' | 'name'>('default');
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
   const [pasteMode, setPasteMode] = useState(false);
@@ -455,6 +539,7 @@ export default function App() {
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [catalogSource, setCatalogSource] = useState('secours (intégré)');
   const [optimizeInfo, setOptimizeInfo] = useState<string | null>(null);
+  const [showDropdownMenu, setShowDropdownMenu] = useState(false);
 
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [detailsCourse, setDetailsCourse] = useState<any>(null);
@@ -463,7 +548,47 @@ export default function App() {
     COUR_CLS: '00', DAY: 'Mon', START_PERIOD: '1', END_PERIOD: '2', ROOM: ''
   });
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const catalogFileInputRef = useRef<HTMLInputElement>(null);
+  const sessionFileInputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const courseKey = (c: any) => `${c.COUR_CD}-${c.COUR_CLS}`;
+
+  // Fermer le menu dropdown lors d'un clic à l'extérieur
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowDropdownMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Persistance LocalStorage
+  useEffect(() => {
+    saveLocalStorage('ku_cat_overrides', categoryOverrides);
+  }, [categoryOverrides]);
+
+  useEffect(() => {
+    saveLocalStorage('ku_ratings', ratings);
+  }, [ratings]);
+
+  useEffect(() => {
+    saveLocalStorage('ku_comments', comments);
+  }, [comments]);
+
+  useEffect(() => {
+    saveLocalStorage('ku_custom_courses', customCourses);
+  }, [customCourses]);
+
+  useEffect(() => {
+    if (selectedCourses.length > 0) {
+      saveLocalStorage('ku_selected_keys', selectedCourses.map(courseKey));
+    } else {
+      saveLocalStorage('ku_selected_keys', []);
+    }
+  }, [selectedCourses]);
 
   // Chargement automatique du catalogue complet (public/courses.json) au démarrage
   useEffect(() => {
@@ -476,17 +601,27 @@ export default function App() {
         const rows = Array.isArray(data) ? data : data.rows || [];
         const normalized = rows.map(normalizeRow).filter((r: any) => r.COUR_CD);
         if (normalized.length > 0) {
-          setCourses(normalized);
-          setCatalogSource(`courses.json (${normalized.length} cours, tous collèges, Fall 2R 2026)`);
+          const combined = [...customCourses, ...normalized];
+          setCourses(combined);
+          setCatalogSource(`courses.json (${normalized.length} cours, Fall 2026)`);
+
+          const savedKeys = loadLocalStorage<string[]>('ku_selected_keys', []);
+          if (savedKeys.length > 0) {
+            const keySet = new Set(savedKeys);
+            const restoreSelected = combined.filter(c => keySet.has(courseKey(c)));
+            if (restoreSelected.length > 0) {
+              setSelectedCourses(restoreSelected);
+            }
+          }
         }
       })
       .catch(() => {
-        setJsonError("Impossible de charger public/courses.json automatiquement — le catalogue de secours (3 cours) est utilisé. Chargez votre propre fichier via 'Charger Fichier'.");
+        const combined = [...customCourses, ...FALLBACK_COURSES];
+        setCourses(combined);
+        setJsonError("Impossible de charger public/courses.json automatiquement — le catalogue de secours (3 cours) est utilisé.");
       })
       .finally(() => setLoadingCatalog(false));
   }, []);
-
-  const courseKey = (c: any) => `${c.COUR_CD}-${c.COUR_CLS}`;
 
   const getEffectiveCategory = (c: any): Category => {
     const override = categoryOverrides[courseKey(c)];
@@ -500,13 +635,137 @@ export default function App() {
     setCategoryOverrides(prev => ({ ...prev, [courseKey(c)]: next }));
   };
 
+  const handleSetRating = (c: any, rating: number) => {
+    const key = courseKey(c);
+    setRatings(prev => {
+      const next = { ...prev };
+      if (rating <= 0) delete next[key];
+      else next[key] = rating;
+      return next;
+    });
+  };
+
+  const handleSetComment = (c: any, comment: string) => {
+    const key = courseKey(c);
+    setComments(prev => {
+      const next = { ...prev };
+      if (!comment.trim()) delete next[key];
+      else next[key] = comment;
+      return next;
+    });
+  };
+
+  const handleExportSession = () => {
+    const exportData = {
+      type: 'ku_planner_backup',
+      version: '1.0',
+      exportDate: new Date().toISOString(),
+      selectedCourseKeys: selectedCourses.map(courseKey),
+      categoryOverrides,
+      ratings,
+      comments,
+      customCourses
+    };
+
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(exportData, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `ku_sejong_backup_${new Date().toISOString().slice(0, 10)}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+    setShowDropdownMenu(false);
+  };
+
+  // Chargement d'un fichier de catalogue brut (ex: all_sejong_fall2026.json)
+  const handleCatalogFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = event => {
+      try {
+        const rawText = String(event.target?.result || '');
+        const normalized = processJsonPayload(rawText);
+        const combined = [...customCourses, ...normalized];
+        setCourses(combined);
+        setCatalogSource(`Catalogue importé : ${file.name} (${normalized.length} cours)`);
+        setJsonError(null);
+        setImportSuccess(true);
+        setTimeout(() => setImportSuccess(false), 5000);
+      } catch (err: any) {
+        setJsonError(`Erreur lors de l'importation du catalogue : ${err.message}`);
+        setImportSuccess(false);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+    setShowDropdownMenu(false);
+  };
+
+  // Restauration d'un fichier de session (.json)
+  const handleSessionFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = event => {
+      try {
+        processJsonText(String(event.target?.result || ''));
+      } catch (err: any) {
+        setJsonError(`Erreur lors de la restauration de la session : ${err.message}`);
+        setImportSuccess(false);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+    setShowDropdownMenu(false);
+  };
+
   const processJsonText = (rawText: string) => {
     try {
-      const normalized = processJsonPayload(rawText);
-      setCourses(normalized);
-      setCategoryOverrides({});
-      setSelectedCourses([]);
-      setCatalogSource(`fichier importé (${normalized.length} cours)`);
+      let cleanText = rawText.trim();
+      if (cleanText.charCodeAt(0) === 0xfeff) cleanText = cleanText.slice(1);
+
+      const parsed = JSON.parse(cleanText);
+
+      // Si c'est une sauvegarde de session complète
+      if (parsed.type === 'ku_planner_backup' || parsed.ratings || parsed.comments || parsed.selectedCourseKeys) {
+        if (parsed.ratings && typeof parsed.ratings === 'object') {
+          setRatings(parsed.ratings);
+        }
+        if (parsed.comments && typeof parsed.comments === 'object') {
+          setComments(parsed.comments);
+        }
+        if (parsed.categoryOverrides && typeof parsed.categoryOverrides === 'object') {
+          setCategoryOverrides(parsed.categoryOverrides);
+        }
+        if (parsed.customCourses && Array.isArray(parsed.customCourses)) {
+          setCustomCourses(parsed.customCourses);
+        }
+
+        const restoreKeys = parsed.selectedCourseKeys || [];
+        if (Array.isArray(restoreKeys) && restoreKeys.length > 0) {
+          const keySet = new Set(restoreKeys);
+          const allAvailable = [...(parsed.customCourses || []), ...courses];
+          const matched = allAvailable.filter(c => keySet.has(courseKey(c)));
+          setSelectedCourses(matched);
+        }
+
+        const ratedNum = Object.keys(parsed.ratings || {}).length;
+        const commentsNum = Object.keys(parsed.comments || {}).length;
+        setJsonError(null);
+        setImportSuccess(true);
+        setCatalogSource(`Session restaurée (${ratedNum} notes, ${commentsNum} commentaires)`);
+        setPasteMode(false);
+        setPasteValue('');
+        setTimeout(() => setImportSuccess(false), 5000);
+        return;
+      }
+
+      // Autrement, c'est un catalogue de cours brut
+      const normalized = processJsonPayload(cleanText);
+      const combined = [...customCourses, ...normalized];
+      setCourses(combined);
+      setCatalogSource(`fichier catalogue importé (${normalized.length} cours)`);
       setJsonError(null);
       setImportSuccess(true);
       setPasteMode(false);
@@ -518,48 +777,82 @@ export default function App() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = event => processJsonText(String(event.target?.result || ''));
-    reader.readAsText(file);
-  };
-
   const handlePasteSubmit = () => {
     if (!pasteValue.trim()) return;
     processJsonText(pasteValue);
   };
 
-  const coursesWithSchedules = useMemo(() => {
-    return courses.map(c => ({
-      ...c,
-      category: getEffectiveCategory(c),
-      college: getCollege(c.DEPARTMENT),
-      difficultyLevel: getDifficultyLevel(c.COUR_CD),
-      parsedSchedules: parseSchedule(c.TIME_ROOM),
-      creditsNum: parseFloat(c.CREDIT) || 0,
-      ...computePreferenceTags(c)
-    }));
+  // OPTIMISATION PERFORMANCES : calcul lourd (horaires, difficulté, collège, tags) exécuté SEULEMENT sur mise à jour des cours ou catégories.
+  const coursesBase = useMemo(() => {
+    return courses.map(c => {
+      const category = getEffectiveCategory(c);
+      const college = getCollege(c.DEPARTMENT);
+      const difficultyLevel = getDifficultyLevel(c.COUR_CD);
+      const parsedSchedules = parseSchedule(c.TIME_ROOM);
+      const creditsNum = parseFloat(c.CREDIT) || 0;
+      const tags = computePreferenceTags(c);
+      return {
+        ...c,
+        category,
+        college,
+        difficultyLevel,
+        parsedSchedules,
+        creditsNum,
+        ...tags
+      };
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courses, categoryOverrides]);
 
+  // Fusion ultra-rapide des notes & commentaires instantanée (< 1ms) sans refaire de regex ni parsing.
+  const coursesWithSchedules = useMemo(() => {
+    return coursesBase.map(c => {
+      const key = courseKey(c);
+      const rating = ratings[key] || 0;
+      const comment = comments[key] || '';
+      return { ...c, rating, comment };
+    });
+  }, [coursesBase, ratings, comments]);
+
+  const ratedCoursesCount = useMemo(() => {
+    return coursesWithSchedules.filter(c => c.rating > 0 || (c.comment && c.comment.trim().length > 0)).length;
+  }, [coursesWithSchedules]);
+
   const filteredCoursesList = useMemo(() => {
-    return coursesWithSchedules.filter(c => {
+    const filtered = coursesWithSchedules.filter(c => {
       const term = searchTerm.toLowerCase();
       const matchesSearch =
         c.COUR_NM.toLowerCase().includes(term) ||
         c.COUR_CD.toLowerCase().includes(term) ||
         c.DEPARTMENT.toLowerCase().includes(term) ||
         c.college.toLowerCase().includes(term) ||
-        c.PROF_NM.toLowerCase().includes(term);
+        c.PROF_NM.toLowerCase().includes(term) ||
+        (c.comment && c.comment.toLowerCase().includes(term));
 
-      const matchesTab = activeTab === 'all' || c.category === activeTab.toUpperCase();
+      let matchesTab = false;
+      if (activeTab === 'all') matchesTab = true;
+      else if (activeTab === 'rated') matchesTab = c.rating > 0 || (c.comment && c.comment.trim().length > 0);
+      else matchesTab = c.category === activeTab.toUpperCase();
+
       const matchesExchange = showClosedExchange || c.openToExchange;
 
       return matchesSearch && matchesTab && matchesExchange;
     });
-  }, [coursesWithSchedules, searchTerm, activeTab, showClosedExchange]);
+
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'rating-desc') {
+        if (b.rating !== a.rating) return b.rating - a.rating;
+        return a.COUR_CD.localeCompare(b.COUR_CD);
+      }
+      if (sortBy === 'rating-asc') {
+        if (a.rating !== b.rating) return a.rating - b.rating;
+        return a.COUR_CD.localeCompare(b.COUR_CD);
+      }
+      if (sortBy === 'code') return a.COUR_CD.localeCompare(b.COUR_CD);
+      if (sortBy === 'name') return a.COUR_NM.localeCompare(b.COUR_NM);
+      return 0;
+    });
+  }, [coursesWithSchedules, searchTerm, activeTab, showClosedExchange, sortBy]);
 
   const toggleCourse = (course: any) => {
     const isSelected = selectedCourses.some(sc => courseKey(sc) === courseKey(course));
@@ -625,14 +918,12 @@ export default function App() {
   }, [selectedStats]);
 
   const handleAutoOptimize = () => {
-    // Colonne "X" du site sugang : un cours non coché ne peut pas être pris par un étudiant en échange,
-    // donc on l'exclut d'emblée de la recherche automatique.
     const it = coursesWithSchedules.filter(c => c.category === 'IT' && c.openToExchange);
     const business = coursesWithSchedules.filter(c => c.category === 'BUSINESS' && c.openToExchange);
     const korean = coursesWithSchedules.filter(c => c.category === 'KOREAN' && c.openToExchange);
 
     if (korean.length === 0 || business.length === 0 || it.length < 3) {
-      setJsonError("Pas assez de cours ouverts aux échanges (colonne X) dans ces catégories pour générer une combinaison (il faut au moins 1 Coréen, 1 Business et 3 IT marqués OUVERT). Vérifiez les catégories via le badge cliquable sur chaque carte, ou composez manuellement.");
+      setJsonError("Pas assez de cours ouverts aux échanges (colonne X) dans ces catégories pour générer une combinaison. Vérifiez les catégories via le badge cliquable sur chaque carte, ou composez manuellement.");
       setOptimizeInfo(null);
       return;
     }
@@ -659,7 +950,7 @@ export default function App() {
       setOptimizeInfo(tierMessage);
     } else {
       setOptimizeInfo(null);
-      setJsonError("Aucune combinaison valide trouvée, même en autorisant jusqu'à Vendredi/Samedi. Essayez de composer manuellement, ou reclassez certains cours (badge de catégorie cliquable).");
+      setJsonError("Aucune combinaison valide trouvée, même en autorisant jusqu'à Vendredi/Samedi. Essayez de composer manuellement.");
     }
   };
 
@@ -678,6 +969,7 @@ export default function App() {
       TIME: ''
     };
 
+    setCustomCourses(prev => [newCourseObj, ...prev]);
     setCourses(prev => [newCourseObj, ...prev]);
     setShowCustomModal(false);
   };
@@ -692,6 +984,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 font-sans flex flex-col selection:bg-violet-500 selection:text-white">
 
+      {/* Header compact avec Menu Dropdown */}
       <header className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -702,31 +995,106 @@ export default function App() {
               <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
                 KU Sejong Planificateur <span className="text-xs bg-violet-500/20 text-violet-400 border border-violet-500/30 px-2 py-0.5 rounded-full font-mono">Epitech Tech4</span>
               </h1>
-              <p className="text-xs text-zinc-400">3 IT + 1 Business + 1 Coréen · 15 crédits mini · Lun-Mer prioritaire, sinon Lun-Jeu</p>
+              <p className="text-xs text-zinc-400">3 IT + 1 Business + 1 Coréen · Notes, commentaires & gestion de session</p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button onClick={handleAutoOptimize} className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-medium text-sm px-4 py-2 rounded-xl transition duration-200 shadow-md shadow-violet-950/40">
+          <div className="flex items-center gap-3">
+            {/* Bouton principal d'optimisation */}
+            <button
+              onClick={handleAutoOptimize}
+              className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition duration-200 shadow-md shadow-violet-950/40"
+            >
               <Sparkles className="h-4 w-4" />
               <span>Optimisation Auto</span>
             </button>
 
-            <button onClick={() => setShowCustomModal(true)} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-violet-300 border border-violet-500/30 text-sm px-4 py-2 rounded-xl transition">
-              <PlusCircle className="h-4 w-4" />
-              <span>Ajouter un cours</span>
-            </button>
+            {/* Menu Dropdown pour les actions et imports/exports */}
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setShowDropdownMenu(!showDropdownMenu)}
+                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-750 text-zinc-100 border border-zinc-700 text-xs font-semibold px-4 py-2.5 rounded-xl transition duration-150 shadow-sm"
+              >
+                <Sliders className="h-4 w-4 text-violet-400" />
+                <span>Actions & Fichiers</span>
+                <ChevronDown className={`h-3.5 w-3.5 text-zinc-400 transition-transform duration-200 ${showDropdownMenu ? 'rotate-180' : ''}`} />
+              </button>
 
-            <button onClick={() => setPasteMode(!pasteMode)} className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-700 text-xs px-3 py-2 rounded-xl">
-              <Clipboard className="h-3.5 w-3.5" />
-              <span>{pasteMode ? 'Annuler' : 'Copier-Coller JSON'}</span>
-            </button>
+              {showDropdownMenu && (
+                <div className="absolute right-0 mt-2 w-72 bg-zinc-900/95 border border-zinc-800 rounded-2xl shadow-2xl backdrop-blur-xl z-50 p-2 text-xs flex flex-col gap-1 divide-y divide-zinc-800/60">
+                  <div className="px-3 py-1.5 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                    Session & Sauvegarde
+                  </div>
 
-            <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept=".json" className="hidden" />
-            <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-sm px-4 py-2 rounded-xl transition duration-150">
-              <UploadCloud className="h-4 w-4" />
-              <span>Charger Fichier</span>
-            </button>
+                  <div className="pt-1 flex flex-col gap-0.5">
+                    <button
+                      onClick={handleExportSession}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-emerald-300 hover:bg-emerald-500/10 transition text-left"
+                    >
+                      <Download className="h-4 w-4 text-emerald-400" />
+                      <div>
+                        <div className="font-semibold">Exporter ma session (.json)</div>
+                        <div className="text-[10px] text-zinc-400">Sauvegarder notes, avis et emploi du temps</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => sessionFileInputRef.current?.click()}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-zinc-200 hover:bg-zinc-800 transition text-left"
+                    >
+                      <FileJson className="h-4 w-4 text-violet-400" />
+                      <div>
+                        <div className="font-semibold">Restaurer une session (.json)</div>
+                        <div className="text-[10px] text-zinc-400">Recharger une sauvegarde complète</div>
+                      </div>
+                    </button>
+                  </div>
+
+                  <div className="px-3 pt-2.5 pb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                    Catalogue & Cours
+                  </div>
+
+                  <div className="pt-1 flex flex-col gap-0.5">
+                    <button
+                      onClick={() => catalogFileInputRef.current?.click()}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-zinc-200 hover:bg-zinc-800 transition text-left"
+                    >
+                      <FolderOpen className="h-4 w-4 text-sky-400" />
+                      <div>
+                        <div className="font-semibold">Charger un catalogue (.json)</div>
+                        <div className="text-[10px] text-zinc-400">Importer un fichier de cours KU Sejong</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => { setPasteMode(!pasteMode); setShowDropdownMenu(false); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-zinc-200 hover:bg-zinc-800 transition text-left"
+                    >
+                      <Clipboard className="h-4 w-4 text-amber-400" />
+                      <div>
+                        <div className="font-semibold">Copier-Coller du JSON</div>
+                        <div className="text-[10px] text-zinc-400">Insérer directement le texte JSON</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => { setShowCustomModal(true); setShowDropdownMenu(false); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-violet-300 hover:bg-violet-500/10 transition text-left"
+                    >
+                      <PlusCircle className="h-4 w-4 text-violet-400" />
+                      <div>
+                        <div className="font-semibold">Ajouter un cours sur-mesure</div>
+                        <div className="text-[10px] text-zinc-400">Créer un cours manuellement</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Inputs de fichiers cachés */}
+            <input type="file" ref={catalogFileInputRef} onChange={handleCatalogFileUpload} accept=".json" className="hidden" />
+            <input type="file" ref={sessionFileInputRef} onChange={handleSessionFileUpload} accept=".json" className="hidden" />
           </div>
         </div>
       </header>
@@ -738,17 +1106,22 @@ export default function App() {
           {loadingCatalog && (
             <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl flex items-center gap-3 text-xs text-zinc-400">
               <Loader2 className="h-4 w-4 animate-spin text-violet-400" />
-              <span>Chargement du catalogue complet...</span>
+              <span>Chargement du catalogue...</span>
             </div>
           )}
 
           {pasteMode && (
             <div className="bg-zinc-900 border border-violet-500/40 p-5 rounded-3xl shadow-xl flex flex-col gap-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Clipboard className="h-4 w-4 text-violet-400" />
-                <span>Coller le contenu du JSON directement</span>
+              <h3 className="text-sm font-bold text-white flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Clipboard className="h-4 w-4 text-violet-400" />
+                  <span>Coller le contenu JSON</span>
+                </span>
+                <button onClick={() => setPasteMode(false)} className="text-zinc-500 hover:text-zinc-300">
+                  <X className="h-4 w-4" />
+                </button>
               </h3>
-              <p className="text-xs text-zinc-400">Collez un export de l'API (objet avec "rows", ou tableau brut de cours).</p>
+              <p className="text-xs text-zinc-400">Collez un export de session (avec notes/commentaires) ou un fichier catalogue brut.</p>
               <textarea
                 value={pasteValue}
                 onChange={e => setPasteValue(e.target.value)}
@@ -775,7 +1148,7 @@ export default function App() {
             <div className="bg-emerald-950/40 border border-emerald-800 text-emerald-200 p-4 rounded-2xl flex items-start gap-3">
               <CheckCircle className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
               <div className="text-xs">
-                <p className="font-semibold text-sm text-emerald-300">Catalogue mis à jour</p>
+                <p className="font-semibold text-sm text-emerald-300">Succès</p>
                 <p className="mt-1 text-emerald-400">{catalogSource}</p>
               </div>
             </div>
@@ -791,8 +1164,12 @@ export default function App() {
             </div>
           )}
 
-          <div className="bg-zinc-900/60 border border-zinc-800 p-3 rounded-2xl text-[11px] text-zinc-500 text-center">
-            Source active : <span className="text-zinc-300">{catalogSource}</span> · {courses.length} cours au total
+          <div className="bg-zinc-900/60 border border-zinc-800 p-3 rounded-2xl text-[11px] text-zinc-400 flex items-center justify-between">
+            <div>Source : <span className="text-zinc-200 font-semibold">{catalogSource}</span></div>
+            <div className="text-amber-400 font-mono flex items-center gap-1">
+              <Star className="h-3 w-3 fill-amber-400" />
+              <span>{ratedCoursesCount} noté(s)</span>
+            </div>
           </div>
 
           <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-xl flex flex-col gap-5">
@@ -866,7 +1243,7 @@ export default function App() {
                 <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 p-3 rounded-xl flex items-start gap-2 text-xs">
                   <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                   <div>
-                    <span className="font-semibold">Places limitées (colonne "2) L") :</span> {selectedStats.limitedSeatsCourses.length} cours sélectionné(s) ont un nombre de places restreint — inscrivez-vous en priorité dès l'ouverture de sugang.korea.ac.kr.
+                    <span className="font-semibold">Places limitées (colonne "2) L") :</span> {selectedStats.limitedSeatsCourses.length} cours sélectionné(s) ont un nombre de places restreint.
                   </div>
                 </div>
               )}
@@ -890,7 +1267,7 @@ export default function App() {
           <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 flex flex-col gap-3">
             <h3 className="font-bold text-xs uppercase tracking-wider text-zinc-400 flex items-center gap-2">
               <Info className="h-4 w-4 text-violet-400" />
-              <span>Aide</span>
+              <span>Informations complémentaires</span>
             </h3>
             <div className="text-xs text-zinc-400 space-y-2">
               <p><strong>Catégorie auto-détectée</strong> par département (IT / Business / Coréen / Autre). Si un cours est mal classé, cliquez sur son badge de catégorie pour le corriger manuellement.</p>
@@ -898,7 +1275,10 @@ export default function App() {
               <p><strong>Affinités perso</strong> (badges sur chaque carte) : ROBOTIQUE et IA sont priorisés par "Optimisation Auto", CYBER / ÉLECTRONIQUE / MATHS sont évités, SOFTWARE = votre branche (facile).</p>
               <p><strong>Visio (MOOC/NEMO)</strong> : ces cours ne comptent pas dans la limite de jours, vous pouvez les ajouter librement.</p>
               <p><strong>Salles</strong> : le code de salle indique d'abord le bâtiment puis la salle (ex : 35-322).</p>
-              <p>Le catalogue chargé par défaut est le fichier <code>public/courses.json</code> (tout Sejong, semestre d'automne 2026). Vous pouvez le remplacer via "Charger Fichier".</p>
+              <p><strong>Étoiles</strong> : Cliquez directement sur les étoiles d'un cours pour lui attribuer une note de 1 à 5 d'intérêt.</p>
+              <p><strong>Commentaires</strong> : Cliquez sur <em>Avis / + Note</em> ou sur la carte pour rédiger vos remarques et retours d'anciens.</p>
+              <p><strong>Onglet "Notés"</strong> : Filtrez instantanément tous les cours auxquels vous avez attribué une note ou un commentaire.</p>
+              <p><strong>Export & Menu Actions</strong> : Le menu <em>Actions & Fichiers</em> en haut à droite vous permet de charger un fichier catalogue brut (.json) ou d'exporter/restaurer votre session complète.</p> <p>Le catalogue chargé par défaut est le fichier <code>public/courses.json</code> (tout Sejong, semestre d'automne 2026). Vous pouvez le remplacer via "Charger Fichier".</p>
             </div>
           </div>
         </div>
@@ -953,7 +1333,15 @@ export default function App() {
                                 onClick={() => setDetailsCourse(course)}
                               >
                                 <div>
-                                  <div className="font-bold line-clamp-1">{course.COUR_CD}</div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-bold line-clamp-1">{course.COUR_CD}</span>
+                                    {course.rating > 0 && (
+                                      <span className="text-[9px] text-amber-300 font-bold flex items-center gap-0.5">
+                                        <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
+                                        {course.rating}
+                                      </span>
+                                    )}
+                                  </div>
                                   <div className="text-[9px] font-normal opacity-80 truncate">{course.COUR_NM}</div>
                                 </div>
 
@@ -963,6 +1351,7 @@ export default function App() {
                                   </span>
                                   <DifficultyScale level={course.difficultyLevel} compact />
                                   {course.seatsLimited && <span className="text-[8px] px-1 rounded font-bold text-white bg-amber-600">LIMITÉ</span>}
+                                  {course.comment && <MessageSquare className="h-2.5 w-2.5 text-violet-300" />}
                                 </div>
 
                                 <div className="flex items-center justify-between text-[8px] opacity-70">
@@ -991,61 +1380,87 @@ export default function App() {
                   <Sliders className="h-4 w-4 text-violet-400" />
                   <span>Catalogue des cours ({filteredCoursesList.length})</span>
                 </h2>
-                <p className="text-xs text-zinc-400 font-normal">Activez les cours souhaités pour composer votre emploi du temps</p>
+                <p className="text-xs text-zinc-400 font-normal">Activez les cours souhaités et gérez vos notes & commentaires</p>
               </div>
 
               <div className="flex flex-wrap gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 w-full md:w-auto">
-                {['all', 'it', 'business', 'korean', 'others'].map(tab => (
+                {['all', 'it', 'business', 'korean', 'others', 'rated'].map(tab => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`text-[11px] px-3 py-1.5 rounded-lg capitalize font-semibold transition ${activeTab === tab ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`text-[11px] px-3 py-1.5 rounded-lg capitalize font-semibold transition flex items-center gap-1 ${activeTab === tab ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
-                    {tab === 'all' ? 'Tous' : CATEGORY_LABELS[tab.toUpperCase() as Category]}
+                    {tab === 'all' && 'Tous'}
+                    {tab === 'it' && 'IT'}
+                    {tab === 'business' && 'Business'}
+                    {tab === 'korean' && 'Coréen'}
+                    {tab === 'others' && 'Autre'}
+                    {tab === 'rated' && (
+                      <>
+                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                        <span>Notés ({ratedCoursesCount})</span>
+                      </>
+                    )}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="flex flex-col gap-5">
-              <div className="relative">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+              <div className="relative flex-1">
                 <Search className="absolute left-4 top-3.5 h-4 w-4 text-zinc-500" />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  placeholder="Filtrer par code, mot-clé, département ou professeur..."
-                  className="w-full bg-zinc-950 text-xs text-zinc-100 pl-11 pr-4 py-3.5 rounded-2xl border border-zinc-800 focus:outline-none focus:ring-1 focus:ring-violet-500 transition"
+                  placeholder="Filtrer par code, mot-clé, département, prof ou commentaire..."
+                  className="w-full bg-zinc-950 text-xs text-zinc-100 pl-11 pr-4 py-3 rounded-2xl border border-zinc-800 focus:outline-none focus:ring-1 focus:ring-violet-500 transition"
                 />
               </div>
 
-              <div className="flex items-center gap-2 px-1">
-                <button
-                  type="button"
-                  onClick={() => setShowClosedExchange(!showClosedExchange)}
-                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    showClosedExchange ? 'bg-violet-600' : 'bg-zinc-800'
-                  }`}
-                  role="switch"
-                  aria-checked={showClosedExchange}
+              <div className="flex items-center gap-2 bg-zinc-950 px-3 py-2 rounded-2xl border border-zinc-800 shrink-0">
+                <ArrowUpDown className="h-3.5 w-3.5 text-zinc-400" />
+                <span className="text-[11px] text-zinc-400 font-medium">Trier par :</span>
+                <select
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value as any)}
+                  className="bg-transparent text-xs text-zinc-100 font-medium focus:outline-none cursor-pointer"
                 >
-                  <span
-                    aria-hidden="true"
-                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                      showClosedExchange ? 'translate-x-4' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
-                <span
-                  className="text-xs text-zinc-300 font-medium cursor-pointer select-none"
-                  onClick={() => setShowClosedExchange(!showClosedExchange)}
-                >
-                  Afficher les cours fermés aux étudiants en échange
-                </span>
+                  <option value="default" className="bg-zinc-900 text-zinc-200">Ordre d'origine</option>
+                  <option value="rating-desc" className="bg-zinc-900 text-zinc-200">⭐ Note (haute → basse)</option>
+                  <option value="rating-asc" className="bg-zinc-900 text-zinc-200">⭐ Note (basse → haute)</option>
+                  <option value="code" className="bg-zinc-900 text-zinc-200">Code de cours</option>
+                  <option value="name" className="bg-zinc-900 text-zinc-200">Nom du cours</option>
+                </select>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[520px] overflow-y-auto pr-1">
+            <div className="flex items-center gap-2 px-1">
+              <button
+                type="button"
+                onClick={() => setShowClosedExchange(!showClosedExchange)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                  showClosedExchange ? 'bg-violet-600' : 'bg-zinc-800'
+                }`}
+                role="switch"
+                aria-checked={showClosedExchange}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    showClosedExchange ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+              <span
+                className="text-xs text-zinc-300 font-medium cursor-pointer select-none"
+                onClick={() => setShowClosedExchange(!showClosedExchange)}
+              >
+                Afficher les cours fermés aux étudiants en échange
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[560px] overflow-y-auto pr-1">
               {filteredCoursesList.length > 0 ? (
                 filteredCoursesList.map((course, idx) => {
                   const isSelected = selectedCourses.some(sc => courseKey(sc) === courseKey(course));
@@ -1054,9 +1469,9 @@ export default function App() {
                   return (
                     <div
                       key={idx}
-                      className={`border rounded-2xl ml-[1px] p-4 flex flex-col justify-between gap-4 transition duration-150 ${isSelected ? 'bg-zinc-800/50 border-violet-500 shadow-md' : 'bg-zinc-950/30 border-zinc-800/80 hover:border-zinc-700'} ${!course.openToExchange ? 'ring-1 ring-red-600/40' : ''}`}
+                      className={`border rounded-2xl ml-[1px] p-4 flex flex-col justify-between gap-3 transition duration-150 ${isSelected ? 'bg-zinc-800/50 border-violet-500 shadow-md' : 'bg-zinc-950/30 border-zinc-800/80 hover:border-zinc-700'} ${!course.openToExchange ? 'ring-1 ring-red-600/40' : ''}`}
                     >
-                      <div className="flex flex-col gap-1.5">
+                      <div className="flex flex-col gap-2">
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-mono font-bold text-zinc-400">{course.COUR_CD}-{course.COUR_CLS}</span>
                           <button
@@ -1070,7 +1485,37 @@ export default function App() {
                         </div>
                         <h3 className="text-xs font-bold text-white line-clamp-2">{course.COUR_NM}</h3>
 
-                        <div className="flex flex-col gap-1 text-[11px] text-zinc-400 mt-2">
+                        {/* Barre d'évaluation & accès rapide au commentaire */}
+                        <div className="flex items-center justify-between bg-zinc-950/80 border border-zinc-800/80 px-2.5 py-1.5 rounded-xl">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-zinc-500 font-semibold uppercase">Note :</span>
+                            <StarRating rating={course.rating} onRate={r => handleSetRating(course, r)} size="sm" />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setDetailsCourse(course)}
+                            className={`text-[10px] flex items-center gap-1 font-semibold px-2 py-0.5 rounded-lg border transition ${
+                              course.comment
+                                ? 'bg-violet-500/15 border-violet-500/30 text-violet-300 hover:bg-violet-500/25'
+                                : 'bg-zinc-900 border-zinc-800 text-zinc-500 hover:text-zinc-300'
+                            }`}
+                          >
+                            <MessageSquare className="h-3 w-3" />
+                            <span>{course.comment ? 'Avis' : '+ Note'}</span>
+                          </button>
+                        </div>
+
+                        {course.comment && (
+                          <div
+                            onClick={() => setDetailsCourse(course)}
+                            className="bg-zinc-900/90 border border-zinc-800/80 p-2 rounded-xl text-[10px] text-zinc-300 flex items-start gap-1.5 cursor-pointer hover:border-zinc-700 transition"
+                          >
+                            <MessageSquare className="h-3 w-3 text-violet-400 shrink-0 mt-0.5" />
+                            <span className="italic line-clamp-2 leading-relaxed">{course.comment}</span>
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-1 text-[11px] text-zinc-400 mt-1">
                           <div className="flex items-start gap-1.5">
                             <span className="text-zinc-600 font-medium shrink-0">Collège :</span>
                             <span className="text-zinc-300 leading-tight">{course.college}</span>
@@ -1095,7 +1540,7 @@ export default function App() {
                                 ))}
                               </div>
                             ) : (
-                              <span className="text-zinc-500 italic">Non planifié (ex: stage)</span>
+                              <span className="text-zinc-500 italic">Non planifié</span>
                             )}
                           </div>
                           <div className="flex items-center gap-1.5">
@@ -1104,7 +1549,7 @@ export default function App() {
                           </div>
                         </div>
 
-                        <div className="border-t border-zinc-800/80 mt-2 pt-2 flex flex-col gap-1.5">
+                        <div className="border-t border-zinc-800/80 mt-1 pt-2 flex flex-col gap-1.5">
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wide">Difficulté</span>
                             <DifficultyScale level={course.difficultyLevel} />
@@ -1156,7 +1601,7 @@ export default function App() {
               ) : (
                 <div className="col-span-full py-12 text-center flex flex-col items-center gap-2 text-zinc-500">
                   <Filter className="h-8 w-8 text-zinc-700 animate-pulse" />
-                  <p className="text-xs">Aucun cours trouvé dans cette catégorie.</p>
+                  <p className="text-xs">Aucun cours trouvé avec ces critères de recherche.</p>
                 </div>
               )}
             </div>
@@ -1164,13 +1609,14 @@ export default function App() {
         </div>
       </main>
 
+      {/* Modale de détails du cours avec Éditeur de commentaire fluide */}
       {detailsCourse && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setDetailsCourse(null)}>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-zinc-850 pb-3 mb-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 w-full max-w-lg shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between border-b border-zinc-850 pb-3">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <CalendarIcon className="h-4 w-4 text-violet-400" />
-                <span>Détails du cours</span>
+                <span>Détails & Avis sur le cours</span>
               </h3>
               <button onClick={() => setDetailsCourse(null)} className="text-zinc-400 hover:text-zinc-200 transition">
                 <X className="h-4 w-4" />
@@ -1185,9 +1631,34 @@ export default function App() {
                 </span>
               </div>
 
-              <h4 className="text-sm font-bold text-white">{detailsCourse.COUR_NM}</h4>
+              <h4 className="text-base font-bold text-white leading-snug">{detailsCourse.COUR_NM}</h4>
 
-              <div className="flex flex-col gap-1.5 text-zinc-400">
+              {/* Évaluation par étoiles */}
+              <div className="flex items-center justify-between bg-zinc-950 p-3 rounded-2xl border border-zinc-800">
+                <span className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                  <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                  <span>Note d'intérêt :</span>
+                </span>
+                <StarRating
+                  rating={ratings[courseKey(detailsCourse)] || 0}
+                  onRate={r => handleSetRating(detailsCourse, r)}
+                  size="md"
+                />
+              </div>
+
+              {/* Commentaire / Notes personnelles optimisé */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                  <MessageSquare className="h-4 w-4 text-violet-400" />
+                  <span>Commentaire & Notes personnelles</span>
+                </label>
+                <CommentEditor
+                  initialComment={comments[courseKey(detailsCourse)] || ''}
+                  onSave={txt => handleSetComment(detailsCourse, txt)}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5 text-zinc-400 border-t border-zinc-800 pt-3">
                 <div className="flex items-start gap-1.5">
                   <span className="text-zinc-600 font-medium shrink-0">Collège :</span>
                   <span className="text-zinc-300 leading-tight">{detailsCourse.college}</span>
@@ -1238,24 +1709,21 @@ export default function App() {
                     <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">LIMITÉES</span>
                   </div>
                 )}
-                {(detailsCourse.robotics || detailsCourse.aiFit || detailsCourse.softwareEasy || detailsCourse.cyber || detailsCourse.electronicsAvoid || detailsCourse.mathHeavy) && (
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {detailsCourse.robotics && <span className="text-[9px] px-1.5 py-0.5 rounded border border-fuchsia-500/30 text-fuchsia-300 bg-fuchsia-500/10 font-semibold">ROBOTIQUE</span>}
-                    {detailsCourse.aiFit && <span className="text-[9px] px-1.5 py-0.5 rounded border border-indigo-500/30 text-indigo-300 bg-indigo-500/10 font-semibold">IA</span>}
-                    {detailsCourse.softwareEasy && <span className="text-[9px] px-1.5 py-0.5 rounded border border-sky-500/30 text-sky-300 bg-sky-500/10 font-semibold">SOFTWARE</span>}
-                    {detailsCourse.cyber && <span className="text-[9px] px-1.5 py-0.5 rounded border border-red-500/30 text-red-300 bg-red-500/10 font-semibold">CYBER</span>}
-                    {detailsCourse.electronicsAvoid && <span className="text-[9px] px-1.5 py-0.5 rounded border border-orange-500/30 text-orange-300 bg-orange-500/10 font-semibold">ÉLECTRONIQUE</span>}
-                    {detailsCourse.mathHeavy && <span className="text-[9px] px-1.5 py-0.5 rounded border border-orange-500/30 text-orange-300 bg-orange-500/10 font-semibold">MATHS</span>}
-                  </div>
-                )}
               </div>
 
               <button
                 onClick={() => { toggleCourse(detailsCourse); setDetailsCourse(null); }}
-                className="w-full py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 mt-1"
+                className={`w-full py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 mt-2 ${
+                  selectedCourses.some(sc => courseKey(sc) === courseKey(detailsCourse))
+                    ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20'
+                    : 'bg-violet-600 hover:bg-violet-500 text-white shadow-lg'
+                }`}
               >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span>Supprimer de l'emploi du temps</span>
+                {selectedCourses.some(sc => courseKey(sc) === courseKey(detailsCourse)) ? (
+                  <><Trash2 className="h-3.5 w-3.5" /><span>Retirer de l'emploi du temps</span></>
+                ) : (
+                  <><Plus className="h-3.5 w-3.5" /><span>Ajouter à l'emploi du temps</span></>
+                )}
               </button>
             </div>
           </div>
@@ -1356,7 +1824,7 @@ export default function App() {
                     className="w-full bg-zinc-950 p-2 rounded-xl border border-zinc-800 text-zinc-100 focus:outline-none" />
                 </div>
                 <div>
-                  <label className="block text-zinc-400 mb-1">Département (sert à la catégorie auto)</label>
+                  <label className="block text-zinc-400 mb-1">Département</label>
                   <input type="text" value={customCourse.DEPARTMENT}
                     onChange={e => setCustomCourse({ ...customCourse, DEPARTMENT: e.target.value })}
                     className="w-full bg-zinc-950 p-2 rounded-xl border border-zinc-800 text-zinc-100 focus:outline-none" />

@@ -5,3 +5,5 @@ node_modules
 2. \[KU Sejong] Academic Calender 2026.pdf
 ku_sejong_epitech_scheduler.tsx
 ku_sejong_epitech_scheduler.tsx:Zone.Identifier
+dist
+cache

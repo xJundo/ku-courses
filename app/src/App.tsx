@@ -446,6 +446,7 @@ export default function App() {
   const [selectedCourses, setSelectedCourses] = useState<any[]>([]);
   const [categoryOverrides, setCategoryOverrides] = useState<Record<string, Category>>({});
   const [searchTerm, setSearchTerm] = useState('');
+  const [showClosedExchange, setShowClosedExchange] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
@@ -553,10 +554,12 @@ export default function App() {
         c.college.toLowerCase().includes(term) ||
         c.PROF_NM.toLowerCase().includes(term);
 
-      if (activeTab === 'all') return matchesSearch;
-      return matchesSearch && c.category === activeTab.toUpperCase();
+      const matchesTab = activeTab === 'all' || c.category === activeTab.toUpperCase();
+      const matchesExchange = showClosedExchange || c.openToExchange;
+
+      return matchesSearch && matchesTab && matchesExchange;
     });
-  }, [coursesWithSchedules, searchTerm, activeTab]);
+  }, [coursesWithSchedules, searchTerm, activeTab, showClosedExchange]);
 
   const toggleCourse = (course: any) => {
     const isSelected = selectedCourses.some(sc => courseKey(sc) === courseKey(course));
@@ -1004,15 +1007,42 @@ export default function App() {
               </div>
             </div>
 
-            <div className="relative">
-              <Search className="absolute left-4 top-3.5 h-4 w-4 text-zinc-500" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Filtrer par code, mot-clé, département ou professeur..."
-                className="w-full bg-zinc-950 text-xs text-zinc-100 pl-11 pr-4 py-3.5 rounded-2xl border border-zinc-800 focus:outline-none focus:ring-1 focus:ring-violet-500 transition"
-              />
+            <div className="flex flex-col gap-3">
+              <div className="relative">
+                <Search className="absolute left-4 top-3.5 h-4 w-4 text-zinc-500" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  placeholder="Filtrer par code, mot-clé, département ou professeur..."
+                  className="w-full bg-zinc-950 text-xs text-zinc-100 pl-11 pr-4 py-3.5 rounded-2xl border border-zinc-800 focus:outline-none focus:ring-1 focus:ring-violet-500 transition"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 px-1">
+                <button
+                  type="button"
+                  onClick={() => setShowClosedExchange(!showClosedExchange)}
+                  className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    showClosedExchange ? 'bg-violet-600' : 'bg-zinc-800'
+                  }`}
+                  role="switch"
+                  aria-checked={showClosedExchange}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      showClosedExchange ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+                <span
+                  className="text-xs text-zinc-300 font-medium cursor-pointer select-none"
+                  onClick={() => setShowClosedExchange(!showClosedExchange)}
+                >
+                  Afficher les cours fermés aux étudiants en échange
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[520px] overflow-y-auto pr-1">

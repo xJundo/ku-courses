@@ -1054,7 +1054,7 @@ export default function App() {
                   return (
                     <div
                       key={idx}
-                      className={`border rounded-2xl p-4 flex flex-col justify-between gap-4 transition duration-150 ${isSelected ? 'bg-zinc-800/50 border-violet-500 shadow-md' : 'bg-zinc-950/30 border-zinc-800/80 hover:border-zinc-700'} ${!course.openToExchange ? 'ring-1 ring-red-600/40' : ''}`}
+                      className={`border rounded-2xl ml-[1px] p-4 flex flex-col justify-between gap-4 transition duration-150 ${isSelected ? 'bg-zinc-800/50 border-violet-500 shadow-md' : 'bg-zinc-950/30 border-zinc-800/80 hover:border-zinc-700'} ${!course.openToExchange ? 'ring-1 ring-red-600/40' : ''}`}
                     >
                       <div className="flex flex-col gap-1.5">
                         <div className="flex items-center justify-between">

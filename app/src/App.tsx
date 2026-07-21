@@ -1007,7 +1007,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-5">
               <div className="relative">
                 <Search className="absolute left-4 top-3.5 h-4 w-4 text-zinc-500" />
                 <input

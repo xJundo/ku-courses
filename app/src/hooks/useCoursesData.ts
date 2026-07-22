@@ -23,8 +23,8 @@ export function useCoursesData() {
   const [customCourses, setCustomCourses] = useLocalStorageState<Course[]>('ku_custom_courses', []);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [showClosedExchange, setShowClosedExchange] = useState(true);
-  const [showOnlyEnglish, setShowOnlyEnglish] = useState(false);
+  const [showClosedExchange, setShowClosedExchange] = useState(false);
+  const [showOnlyEnglish, setShowOnlyEnglish] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [sortBy, setSortBy] = useState<SortOption>('default');
   const [jsonError, setJsonError] = useState<string | null>(null);

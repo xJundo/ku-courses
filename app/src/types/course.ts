@@ -1,4 +1,6 @@
 export type Category = 'IT' | 'BUSINESS' | 'KOREAN' | 'OTHERS';
+export type SortOption = 'default' | 'rating-desc' | 'rating-asc' | 'level-asc' | 'level-desc' | 'code' | 'name';
+
 
 export interface RawCourse {
   COUR_CD?: string;

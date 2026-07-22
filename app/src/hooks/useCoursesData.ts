@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Category, Course, ProcessedCourse } from '../types/course';
+import { Category, Course, ProcessedCourse, SortOption } from '../types/course';
 import { FALLBACK_COURSES, CATEGORY_ORDER } from '../constants/schedule';
 import {
   autoClassify,
@@ -26,7 +26,7 @@ export function useCoursesData() {
   const [showClosedExchange, setShowClosedExchange] = useState(true);
   const [showOnlyEnglish, setShowOnlyEnglish] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
-  const [sortBy, setSortBy] = useState<'default' | 'rating-desc' | 'rating-asc' | 'code' | 'name'>('default');
+  const [sortBy, setSortBy] = useState<SortOption>('default');
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
@@ -182,6 +182,18 @@ export function useCoursesData() {
       }
       if (sortBy === 'rating-asc') {
         if (a.rating !== b.rating) return a.rating - b.rating;
+        return a.COUR_CD.localeCompare(b.COUR_CD);
+      }
+      if (sortBy === 'level-asc') {
+        const lvlA = a.difficultyLevel ?? 999;
+        const lvlB = b.difficultyLevel ?? 999;
+        if (lvlA !== lvlB) return lvlA - lvlB;
+        return a.COUR_CD.localeCompare(b.COUR_CD);
+      }
+      if (sortBy === 'level-desc') {
+        const lvlA = a.difficultyLevel ?? -1;
+        const lvlB = b.difficultyLevel ?? -1;
+        if (lvlA !== lvlB) return lvlB - lvlA;
         return a.COUR_CD.localeCompare(b.COUR_CD);
       }
       if (sortBy === 'code') return a.COUR_CD.localeCompare(b.COUR_CD);

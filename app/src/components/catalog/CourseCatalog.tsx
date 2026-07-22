@@ -1,6 +1,6 @@
 import React from 'react';
 import { Sliders, Search, ArrowUpDown, Filter, Star } from 'lucide-react';
-import { ProcessedCourse } from '../../types/course';
+import { ProcessedCourse, SortOption } from '../../types/course';
 import { CourseCard } from './CourseCard';
 import { courseKey } from '../../utils/courseUtils';
 
@@ -12,8 +12,8 @@ interface CourseCatalogProps {
   setActiveTab: (tab: string) => void;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
-  sortBy: 'default' | 'rating-desc' | 'rating-asc' | 'code' | 'name';
-  setSortBy: (sort: 'default' | 'rating-desc' | 'rating-asc' | 'code' | 'name') => void;
+  sortBy: SortOption;
+  setSortBy: (sort: SortOption) => void;
   showClosedExchange: boolean;
   setShowClosedExchange: (show: boolean) => void;
   showOnlyEnglish: boolean;
@@ -100,6 +100,8 @@ export const CourseCatalog: React.FC<CourseCatalogProps> = ({
             <option value="default" className="bg-zinc-900 text-zinc-200">Ordre d'origine</option>
             <option value="rating-desc" className="bg-zinc-900 text-zinc-200">⭐ Note (haute → basse)</option>
             <option value="rating-asc" className="bg-zinc-900 text-zinc-200">⭐ Note (basse → haute)</option>
+            <option value="level-asc" className="bg-zinc-900 text-zinc-200">📊 Niveau (1 → 4+)</option>
+            <option value="level-desc" className="bg-zinc-900 text-zinc-200">📊 Niveau (4+ → 1)</option>
             <option value="code" className="bg-zinc-900 text-zinc-200">Code de cours</option>
             <option value="name" className="bg-zinc-900 text-zinc-200">Nom du cours</option>
           </select>

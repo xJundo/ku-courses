@@ -49,7 +49,6 @@ export interface PreferenceTags {
   isOnline: boolean;
   openToExchange: boolean;
   seatsLimited: boolean;
-  isEpitechValidated: boolean;
   score: number;
 }
 

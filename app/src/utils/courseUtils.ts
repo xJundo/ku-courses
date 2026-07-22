@@ -1,5 +1,4 @@
 import { Category, Course, PreferenceTags, RawCourse } from '../types/course';
-import { isEpitechCourse } from '../constants/epitech';
 import {
   COLLEGE_RULES,
   IT_DEPT_REGEX,
@@ -49,8 +48,6 @@ export function getDifficultyColor(level: number | null): string {
 }
 
 export function computePreferenceTags(course: {
-  COUR_CD?: string;
-  COUR_CLS?: string;
   COUR_NM: string;
   DEPARTMENT: string;
   MOOC_YN?: string;
@@ -71,7 +68,6 @@ export function computePreferenceTags(course: {
 
   const openToExchange = course.EXCH_COR_YN !== '1';
   const seatsLimited = course.LMT_YN === '1';
-  const isEpitechValidated = isEpitechCourse(course.COUR_CD || '', course.COUR_CLS || '');
 
   let score = 0;
   if (cyber) score -= 3;
@@ -81,9 +77,8 @@ export function computePreferenceTags(course: {
   if (aiFit) score += 2;
   if (softwareEasy) score += 1;
   if (!openToExchange) score -= 5;
-  if (isEpitechValidated) score += 5;
 
-  return { cyber, robotics, electronicsAvoid, mathHeavy, aiFit, softwareEasy, isOnline, openToExchange, seatsLimited, isEpitechValidated, score };
+  return { cyber, robotics, electronicsAvoid, mathHeavy, aiFit, softwareEasy, isOnline, openToExchange, seatsLimited, score };
 }
 
 export function autoClassify(course: { COUR_CD: string; COUR_NM: string; DEPARTMENT: string }): Category {

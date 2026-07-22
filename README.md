@@ -10,6 +10,7 @@ An interactive course scheduler and timetable optimizer designed for students (e
 
 > ℹ️ **Note on Language & Datasets**:
 > - **App Language**: The user interface of the web application is in **French**.
+> - **Data Source**: All JSON datasets available in this project are extracted directly from the official Korea University course portal: [https://sugang.korea.ac.kr/](https://sugang.korea.ac.kr/).
 > - **Semester Support**: The bundled default dataset is based on **Fall 2026** course data. However, the application is semester-agnostic: you can easily import and load course datasets for **any other semester** by uploading or pasting a compatible JSON file directly on the website.
 
 ---
@@ -65,10 +66,10 @@ An interactive course scheduler and timetable optimizer designed for students (e
 
 ## 🔄 Multi-Semester Data Support
 
-Although default datasets provided in this repository are sourced from **Fall 2026**, the application supports course data from **any academic semester**.
+Although default datasets provided in this repository are sourced from **Fall 2026** (extracted from the official Korea University course website [sugang.korea.ac.kr](https://sugang.korea.ac.kr/)), the application supports course data from **any academic semester**.
 
 You can load datasets for any semester directly:
-1. **Directly on the web app (UI)**: Click the **"Coller JSON"** (Paste JSON) button in the top menu to paste raw course JSON copied from the KU course portal or scrapers. You can also import saved session files anytime.
+1. **Directly on the web app (UI)**: Click the **"Coller JSON"** (Paste JSON) button in the top menu to paste raw course JSON copied from the KU course portal ([sugang.korea.ac.kr](https://sugang.korea.ac.kr/)) or scrapers. You can also import saved session files anytime.
 2. **Via project source**: Replace `public/courses.json` with your preferred semester dataset before launching the application.
 
 ---

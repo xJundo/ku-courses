@@ -1,11 +1,11 @@
 import React from 'react';
-import { Calendar as CalendarIcon, X, Star, MessageSquare, Trash2, Plus } from 'lucide-react';
+import { Calendar as CalendarIcon, X, Star, MessageSquare, Trash2, Plus, ExternalLink } from 'lucide-react';
 import { Category, ProcessedCourse } from '../../types/course';
 import { CATEGORY_COLORS, CATEGORY_LABELS, DAYS_FR } from '../../constants/schedule';
 import { DifficultyScale } from '../common/DifficultyScale';
 import { StarRating } from '../common/StarRating';
 import { CommentEditor } from '../common/CommentEditor';
-import { courseKey } from '../../utils/courseUtils';
+import { courseKey, getSyllabusUrl } from '../../utils/courseUtils';
 
 interface CourseDetailsModalProps {
   course: ProcessedCourse;
@@ -131,9 +131,19 @@ export const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
             )}
           </div>
 
+          <a
+            href={getSyllabusUrl(course)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-2 rounded-xl text-xs font-semibold border border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 transition flex items-center justify-center gap-1.5 mt-1"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            <span>Consulter le Syllabus officiel (Korea University)</span>
+          </a>
+
           <button
             onClick={() => { onToggleCourse(course); onClose(); }}
-            className={`w-full py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 mt-2 ${
+            className={`w-full py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 mt-1 ${
               isSelected
                 ? 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20'
                 : 'bg-violet-600 hover:bg-violet-500 text-white shadow-lg'

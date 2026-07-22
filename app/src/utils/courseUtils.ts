@@ -101,6 +101,29 @@ export function getInsensitiveKey(obj: any, keyName: string): any {
   return foundKey ? obj[foundKey] : null;
 }
 
+export function getSyllabusUrl(course: {
+  COUR_CD: string;
+  COUR_CLS?: string;
+  YEAR?: string;
+  TERM?: string;
+  GRAD_CD?: string;
+  DEPT_CD?: string;
+  [key: string]: any;
+}): string {
+  const paramsObj = {
+    syy: course.YEAR || '2026',
+    smtDivcd: course.TERM || '2R',
+    faclyGschDeptCd: course.GRAD_CD || '0136',
+    estblDeprtCd: course.DEPT_CD || '7401',
+    sbjtnb: course.COUR_CD || '',
+    dvcno: course.COUR_CLS || '00'
+  };
+  const jsonStr = JSON.stringify(paramsObj);
+  const base64Str = btoa(jsonStr);
+  const encodedParams = encodeURIComponent(base64Str);
+  return `https://ams.korea.ac.kr/com/lgin/SsoCtr/initExtPageWork.do?link=lctreSylla&locale=en&params=${encodedParams}&swit_call_browser=Y`;
+}
+
 export function normalizeRow(row: RawCourse): Course {
   const params = getInsensitiveKey(row, 'PARAMS') || '';
   const rawCode = getInsensitiveKey(row, 'COUR_CD') || getInsensitiveKey(row, 'course_code') || String(params).split('@')[0] || '';
@@ -109,12 +132,17 @@ export function normalizeRow(row: RawCourse): Course {
   const timeRoom = getInsensitiveKey(row, 'TIME_ROOM') || getInsensitiveKey(row, 'timeRoom') || '';
   const prof = getInsensitiveKey(row, 'PROF_NM') || getInsensitiveKey(row, 'profNm') || '';
   const dept = getInsensitiveKey(row, 'DEPARTMENT') || getInsensitiveKey(row, 'department') || '';
-  const cls = getInsensitiveKey(row, 'COUR_CLS') || getInsensitiveKey(row, 'courCls') || '00';
+  const cls = getInsensitiveKey(row, 'COUR_CLS') || getInsensitiveKey(row, 'courCls') || String(params).split('@')[1] || '00';
   const time = getInsensitiveKey(row, 'TIME') || '';
   const mooc = getInsensitiveKey(row, 'MOOC_YN') || '0';
   const nemo = getInsensitiveKey(row, 'NEMO_YN') || '0';
   const exchOk = getInsensitiveKey(row, 'EXCH_COR_YN') || '0';
   const lmt = getInsensitiveKey(row, 'LMT_YN') || '0';
+
+  const year = getInsensitiveKey(row, 'YEAR') || '2026';
+  const term = getInsensitiveKey(row, 'TERM') || '2R';
+  const gradCd = getInsensitiveKey(row, 'GRAD_CD') || getInsensitiveKey(row, 'faclyGschDeptCd') || '0136';
+  const deptCd = getInsensitiveKey(row, 'DEPT_CD') || getInsensitiveKey(row, 'estblDeprtCd') || '7401';
 
   return {
     COUR_CD: String(rawCode).trim(),
@@ -128,7 +156,11 @@ export function normalizeRow(row: RawCourse): Course {
     MOOC_YN: String(mooc).trim(),
     NEMO_YN: String(nemo).trim(),
     EXCH_COR_YN: String(exchOk).trim(),
-    LMT_YN: String(lmt).trim()
+    LMT_YN: String(lmt).trim(),
+    YEAR: String(year).trim(),
+    TERM: String(term).trim(),
+    GRAD_CD: String(gradCd).trim(),
+    DEPT_CD: String(deptCd).trim()
   };
 }
 

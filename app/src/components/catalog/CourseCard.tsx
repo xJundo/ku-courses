@@ -1,10 +1,10 @@
 import React from 'react';
-import { Tag, Star, MessageSquare, Plus, Trash2 } from 'lucide-react';
+import { Tag, Star, MessageSquare, Plus, Trash2, ExternalLink } from 'lucide-react';
 import { Category, ProcessedCourse } from '../../types/course';
 import { CATEGORY_COLORS, CATEGORY_LABELS, DAYS_FR } from '../../constants/schedule';
 import { DifficultyScale } from '../common/DifficultyScale';
 import { StarRating } from '../common/StarRating';
-import { courseKey } from '../../utils/courseUtils';
+import { courseKey, getSyllabusUrl } from '../../utils/courseUtils';
 
 interface CourseCardProps {
   course: ProcessedCourse;
@@ -130,12 +130,24 @@ export const CourseCard: React.FC<CourseCardProps> = ({
       </div>
 
       <div className="flex items-center justify-between border-t border-zinc-800/80 pt-3 gap-2">
-        <button
-          onClick={() => onOpenDetails(course)}
-          className="text-xs text-zinc-400 hover:text-zinc-200 transition font-medium text-left"
-        >
-          Détails & Avis
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => onOpenDetails(course)}
+            className="text-xs text-zinc-400 hover:text-zinc-200 transition font-medium text-left"
+          >
+            Détails & Avis
+          </button>
+          <a
+            href={getSyllabusUrl(course)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-violet-400 hover:text-violet-300 transition font-medium flex items-center gap-1 bg-violet-500/10 hover:bg-violet-500/20 px-2 py-0.5 rounded-lg border border-violet-500/20"
+            title="Ouvrir le syllabus officiel (AMS Korea University)"
+          >
+            <ExternalLink className="h-3 w-3" />
+            <span>Syllabus</span>
+          </a>
+        </div>
 
         <button
           onClick={() => onToggle(course)}

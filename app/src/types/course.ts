@@ -30,6 +30,10 @@ export interface Course {
   NEMO_YN: string;
   EXCH_COR_YN: string;
   LMT_YN: string;
+  YEAR?: string;
+  TERM?: string;
+  GRAD_CD?: string;
+  DEPT_CD?: string;
 }
 
 export interface ParsedSchedule {

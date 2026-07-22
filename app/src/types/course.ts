@@ -13,6 +13,8 @@ export interface RawCourse {
   NEMO_YN?: string;
   EXCH_COR_YN?: string;
   LMT_YN?: string;
+  ENG_YN?: string;
+  ENG100?: string;
   PARAMS?: string;
   [key: string]: any;
 }
@@ -30,6 +32,8 @@ export interface Course {
   NEMO_YN: string;
   EXCH_COR_YN: string;
   LMT_YN: string;
+  ENG_YN?: string;
+  ENG100?: string;
   YEAR?: string;
   TERM?: string;
   GRAD_CD?: string;
@@ -53,6 +57,7 @@ export interface PreferenceTags {
   isOnline: boolean;
   openToExchange: boolean;
   seatsLimited: boolean;
+  isEnglish: boolean;
   score: number;
 }
 
@@ -108,4 +113,5 @@ export interface CustomCourseFormData {
   START_PERIOD: string;
   END_PERIOD: string;
   ROOM: string;
+  ENG_YN: string;
 }

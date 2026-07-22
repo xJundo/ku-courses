@@ -16,6 +16,8 @@ interface CourseCatalogProps {
   setSortBy: (sort: 'default' | 'rating-desc' | 'rating-asc' | 'code' | 'name') => void;
   showClosedExchange: boolean;
   setShowClosedExchange: (show: boolean) => void;
+  showOnlyEnglish: boolean;
+  setShowOnlyEnglish: (show: boolean) => void;
   onToggleCourse: (course: ProcessedCourse) => void;
   onCycleCategory: (course: ProcessedCourse) => void;
   onSetRating: (course: ProcessedCourse, rating: number) => void;
@@ -34,6 +36,8 @@ export const CourseCatalog: React.FC<CourseCatalogProps> = ({
   setSortBy,
   showClosedExchange,
   setShowClosedExchange,
+  showOnlyEnglish,
+  setShowOnlyEnglish,
   onToggleCourse,
   onCycleCategory,
   onSetRating,
@@ -102,29 +106,57 @@ export const CourseCatalog: React.FC<CourseCatalogProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 px-1">
-        <button
-          type="button"
-          onClick={() => setShowClosedExchange(!showClosedExchange)}
-          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-            showClosedExchange ? 'bg-violet-600' : 'bg-zinc-800'
-          }`}
-          role="switch"
-          aria-checked={showClosedExchange}
-        >
-          <span
-            aria-hidden="true"
-            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-              showClosedExchange ? 'translate-x-4' : 'translate-x-0'
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-1">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowClosedExchange(!showClosedExchange)}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              showClosedExchange ? 'bg-violet-600' : 'bg-zinc-800'
             }`}
-          />
-        </button>
-        <span
-          className="text-xs text-zinc-300 font-medium cursor-pointer select-none"
-          onClick={() => setShowClosedExchange(!showClosedExchange)}
-        >
-          Afficher les cours fermés aux étudiants en échange
-        </span>
+            role="switch"
+            aria-checked={showClosedExchange}
+          >
+            <span
+              aria-hidden="true"
+              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                showClosedExchange ? 'translate-x-4' : 'translate-x-0'
+              }`}
+            />
+          </button>
+          <span
+            className="text-xs text-zinc-300 font-medium cursor-pointer select-none"
+            onClick={() => setShowClosedExchange(!showClosedExchange)}
+          >
+            Afficher les cours fermés aux étudiants en échange
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowOnlyEnglish(!showOnlyEnglish)}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              showOnlyEnglish ? 'bg-indigo-600' : 'bg-zinc-800'
+            }`}
+            role="switch"
+            aria-checked={showOnlyEnglish}
+          >
+            <span
+              aria-hidden="true"
+              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                showOnlyEnglish ? 'translate-x-4' : 'translate-x-0'
+              }`}
+            />
+          </button>
+          <span
+            className="text-xs text-zinc-300 font-medium cursor-pointer select-none flex items-center gap-1.5"
+            onClick={() => setShowOnlyEnglish(!showOnlyEnglish)}
+          >
+            <span>Cours en anglais uniquement</span>
+            <span className="text-xs">🇬🇧</span>
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[560px] overflow-y-auto pr-1">

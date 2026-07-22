@@ -26,6 +26,8 @@ export default function App() {
     setSearchTerm,
     showClosedExchange,
     setShowClosedExchange,
+    showOnlyEnglish,
+    setShowOnlyEnglish,
     activeTab,
     setActiveTab,
     sortBy,
@@ -209,6 +211,8 @@ export default function App() {
             setSortBy={setSortBy}
             showClosedExchange={showClosedExchange}
             setShowClosedExchange={setShowClosedExchange}
+            showOnlyEnglish={showOnlyEnglish}
+            setShowOnlyEnglish={setShowOnlyEnglish}
             onToggleCourse={toggleCourse}
             onCycleCategory={cycleCategory}
             onSetRating={handleSetRating}

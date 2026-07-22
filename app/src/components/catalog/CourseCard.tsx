@@ -32,14 +32,26 @@ export const CourseCard: React.FC<CourseCardProps> = ({
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-mono font-bold text-zinc-400">{courseKey(course)}</span>
-          <button
-            onClick={() => onCycleCategory(course)}
-            title="Cliquer pour changer la catégorie"
-            className={`text-[10px] px-2 py-0.5 rounded-full font-bold border flex items-center gap-1 ${cat.bg}`}
-          >
-            <Tag className="h-2.5 w-2.5" />
-            {CATEGORY_LABELS[course.category as Category]}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-bold border flex items-center gap-1 ${
+                course.isEnglish
+                  ? 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                  : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+              }`}
+              title={course.isEnglish ? 'Dispensé en anglais (ENG_YN = 1)' : 'Dispensé en coréen'}
+            >
+              <span>{course.isEnglish ? '🇬🇧 Anglais' : '🇰🇷 Coréen'}</span>
+            </span>
+            <button
+              onClick={() => onCycleCategory(course)}
+              title="Cliquer pour changer la catégorie"
+              className={`text-[10px] px-2 py-0.5 rounded-full font-bold border flex items-center gap-1 ${cat.bg}`}
+            >
+              <Tag className="h-2.5 w-2.5" />
+              {CATEGORY_LABELS[course.category as Category]}
+            </button>
+          </div>
         </div>
         <h3 className="text-xs font-bold text-white line-clamp-2">{course.COUR_NM}</h3>
 

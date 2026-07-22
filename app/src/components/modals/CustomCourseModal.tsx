@@ -19,7 +19,8 @@ export const CustomCourseModal: React.FC<CustomCourseModalProps> = ({ onClose, o
     DAY: 'Mon',
     START_PERIOD: '1',
     END_PERIOD: '2',
-    ROOM: ''
+    ROOM: '',
+    ENG_YN: '1'
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -38,7 +39,8 @@ export const CustomCourseModal: React.FC<CustomCourseModalProps> = ({ onClose, o
       MOOC_YN: '0',
       NEMO_YN: '0',
       EXCH_COR_YN: '0',
-      LMT_YN: '0'
+      LMT_YN: '0',
+      ENG_YN: formData.ENG_YN
     };
 
     onAddCourse(newCourseObj);
@@ -81,7 +83,7 @@ export const CustomCourseModal: React.FC<CustomCourseModalProps> = ({ onClose, o
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-zinc-400 mb-1 font-semibold">Crédits</label>
               <select
@@ -103,6 +105,17 @@ export const CustomCourseModal: React.FC<CustomCourseModalProps> = ({ onClose, o
                 onChange={e => setFormData({ ...formData, COUR_CLS: e.target.value })}
                 className="w-full bg-zinc-950 p-2.5 rounded-xl border border-zinc-800 text-zinc-100 focus:outline-none focus:border-violet-500"
               />
+            </div>
+            <div>
+              <label className="block text-zinc-400 mb-1 font-semibold">Langue</label>
+              <select
+                value={formData.ENG_YN}
+                onChange={e => setFormData({ ...formData, ENG_YN: e.target.value })}
+                className="w-full bg-zinc-950 p-2.5 rounded-xl border border-zinc-800 text-zinc-100 focus:outline-none focus:border-violet-500"
+              >
+                <option value="1">🇬🇧 Anglais</option>
+                <option value="0">🇰🇷 Coréen</option>
+              </select>
             </div>
           </div>
 

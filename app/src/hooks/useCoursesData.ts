@@ -24,6 +24,7 @@ export function useCoursesData() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showClosedExchange, setShowClosedExchange] = useState(true);
+  const [showOnlyEnglish, setShowOnlyEnglish] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
   const [sortBy, setSortBy] = useState<'default' | 'rating-desc' | 'rating-asc' | 'code' | 'name'>('default');
   const [jsonError, setJsonError] = useState<string | null>(null);
@@ -169,8 +170,9 @@ export function useCoursesData() {
       else matchesTab = c.category === activeTab.toUpperCase();
 
       const matchesExchange = showClosedExchange || c.openToExchange;
+      const matchesEnglish = !showOnlyEnglish || c.isEnglish;
 
-      return matchesSearch && matchesTab && matchesExchange;
+      return matchesSearch && matchesTab && matchesExchange && matchesEnglish;
     });
 
     return [...filtered].sort((a, b) => {
@@ -186,7 +188,7 @@ export function useCoursesData() {
       if (sortBy === 'name') return a.COUR_NM.localeCompare(b.COUR_NM);
       return 0;
     });
-  }, [coursesWithSchedules, searchTerm, activeTab, showClosedExchange, sortBy]);
+  }, [coursesWithSchedules, searchTerm, activeTab, showClosedExchange, showOnlyEnglish, sortBy]);
 
   const toggleCourse = (course: ProcessedCourse) => {
     const isSelected = selectedCourses.some(sc => courseKey(sc) === courseKey(course));
@@ -262,6 +264,8 @@ export function useCoursesData() {
     setSearchTerm,
     showClosedExchange,
     setShowClosedExchange,
+    showOnlyEnglish,
+    setShowOnlyEnglish,
     activeTab,
     setActiveTab,
     sortBy,

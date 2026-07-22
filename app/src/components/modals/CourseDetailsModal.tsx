@@ -114,6 +114,12 @@ export const CourseDetailsModal: React.FC<CourseDetailsModalProps> = ({
 
           <div className="border-t border-zinc-800 pt-3 flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
+              <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wide">Langue d'enseignement</span>
+              <span className={`text-[10px] px-2.5 py-0.5 rounded-md font-bold border ${course.isEnglish ? 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30' : 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>
+                {course.isEnglish ? '🇬🇧 ANGLAIS' : '🇰🇷 CORÉEN'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
               <span className="text-[10px] text-zinc-600 font-semibold uppercase tracking-wide">Difficulté</span>
               <DifficultyScale level={course.difficultyLevel} />
             </div>

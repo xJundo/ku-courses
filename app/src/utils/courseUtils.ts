@@ -54,6 +54,8 @@ export function computePreferenceTags(course: {
   NEMO_YN?: string;
   EXCH_COR_YN?: string;
   LMT_YN?: string;
+  ENG_YN?: string;
+  ENG100?: string;
 }): PreferenceTags {
   const name = course.COUR_NM.toLowerCase();
   const dept = course.DEPARTMENT.toLowerCase();
@@ -68,6 +70,7 @@ export function computePreferenceTags(course: {
 
   const openToExchange = course.EXCH_COR_YN !== '1';
   const seatsLimited = course.LMT_YN === '1';
+  const isEnglish = course.ENG_YN === '1' || course.ENG100 === '1' || /\(english\)|\(eng\)/i.test(course.COUR_NM);
 
   let score = 0;
   if (cyber) score -= 3;
@@ -78,7 +81,7 @@ export function computePreferenceTags(course: {
   if (softwareEasy) score += 1;
   if (!openToExchange) score -= 5;
 
-  return { cyber, robotics, electronicsAvoid, mathHeavy, aiFit, softwareEasy, isOnline, openToExchange, seatsLimited, score };
+  return { cyber, robotics, electronicsAvoid, mathHeavy, aiFit, softwareEasy, isOnline, openToExchange, seatsLimited, isEnglish, score };
 }
 
 export function autoClassify(course: { COUR_CD: string; COUR_NM: string; DEPARTMENT: string }): Category {
@@ -138,6 +141,8 @@ export function normalizeRow(row: RawCourse): Course {
   const nemo = getInsensitiveKey(row, 'NEMO_YN') || '0';
   const exchOk = getInsensitiveKey(row, 'EXCH_COR_YN') || '0';
   const lmt = getInsensitiveKey(row, 'LMT_YN') || '0';
+  const engYn = getInsensitiveKey(row, 'ENG_YN') || '0';
+  const eng100 = getInsensitiveKey(row, 'ENG100') || '0';
 
   const year = getInsensitiveKey(row, 'YEAR') || '2026';
   const term = getInsensitiveKey(row, 'TERM') || '2R';
@@ -157,6 +162,8 @@ export function normalizeRow(row: RawCourse): Course {
     NEMO_YN: String(nemo).trim(),
     EXCH_COR_YN: String(exchOk).trim(),
     LMT_YN: String(lmt).trim(),
+    ENG_YN: String(engYn).trim(),
+    ENG100: String(eng100).trim(),
     YEAR: String(year).trim(),
     TERM: String(term).trim(),
     GRAD_CD: String(gradCd).trim(),

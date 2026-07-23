@@ -10,6 +10,8 @@ import { ScheduleTable } from './components/schedule/ScheduleTable';
 import { CourseCatalog } from './components/catalog/CourseCatalog';
 import { CourseDetailsModal } from './components/modals/CourseDetailsModal';
 import { CustomCourseModal } from './components/modals/CustomCourseModal';
+import { CommunityCalendarsModal } from './components/modals/CommunityCalendarsModal';
+import { CreateCalendarModal } from './components/modals/CreateCalendarModal';
 
 export default function App() {
   const {
@@ -22,6 +24,16 @@ export default function App() {
     ratings,
     comments,
     customCourses,
+    activeCalendar,
+    activeCalendarId,
+    showCommunityModal,
+    setShowCommunityModal,
+    showCreateCalendarModal,
+    setShowCreateCalendarModal,
+    loadCalendarById,
+    saveActiveCalendar,
+    createNewCalendar,
+    duplicateCalendar,
     searchTerm,
     setSearchTerm,
     showClosedExchange,
@@ -172,6 +184,9 @@ export default function App() {
         onSessionFileUpload={handleSessionFileUpload}
         onTogglePasteMode={() => setPasteMode(!pasteMode)}
         onOpenCustomModal={() => setShowCustomModal(true)}
+        activeCalendar={activeCalendar}
+        onOpenCommunityModal={() => setShowCommunityModal(true)}
+        onSaveActiveCalendar={saveActiveCalendar}
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -241,9 +256,31 @@ export default function App() {
         />
       )}
 
+      {showCommunityModal && (
+        <CommunityCalendarsModal
+          onClose={() => setShowCommunityModal(false)}
+          activeCalendarId={activeCalendarId}
+          onSelectCalendar={id => {
+            loadCalendarById(id);
+            setShowCommunityModal(false);
+          }}
+          onOpenCreateModal={() => setShowCreateCalendarModal(true)}
+          onSaveCurrentToActive={saveActiveCalendar}
+          onDuplicateCalendar={duplicateCalendar}
+        />
+      )}
+
+      {showCreateCalendarModal && (
+        <CreateCalendarModal
+          onClose={() => setShowCreateCalendarModal(false)}
+          onCreate={createNewCalendar}
+          currentCourseCount={selectedCourses.length}
+        />
+      )}
+
       <footer className="border-t border-zinc-800 py-6 text-center text-xs text-zinc-500 bg-zinc-950">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p>KU Sejong · Fall 2026 · Planificateur personnel (non-officiel)</p>
+          <p>KU Sejong · Fall 2026 · Planificateur communautaire self-hosted</p>
         </div>
       </footer>
     </div>

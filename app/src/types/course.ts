@@ -104,6 +104,22 @@ export interface SessionBackup {
   customCourses: Course[];
 }
 
+export interface CommunityCalendar {
+  id: string;
+  name: string;
+  author: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+  selectedCourseKeys: string[];
+  categoryOverrides: Record<string, Category>;
+  ratings: Record<string, number>;
+  comments: Record<string, string>;
+  customCourses: Course[];
+  courseCount?: number;
+  totalCredits?: number;
+}
+
 export interface CustomCourseFormData {
   COUR_CD: string;
   COUR_NM: string;
@@ -117,3 +133,4 @@ export interface CustomCourseFormData {
   ROOM: string;
   ENG_YN: string;
 }
+

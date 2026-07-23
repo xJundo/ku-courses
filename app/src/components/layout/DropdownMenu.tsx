@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Download, FileJson, FolderOpen, Clipboard, PlusCircle, Sliders, ChevronDown } from 'lucide-react';
+import { Download, FileJson, FolderOpen, Clipboard, PlusCircle, Sliders, ChevronDown, Globe } from 'lucide-react';
 
 interface DropdownMenuProps {
   showMenu: boolean;
@@ -9,6 +9,7 @@ interface DropdownMenuProps {
   onOpenCatalogFile: () => void;
   onTogglePasteMode: () => void;
   onOpenCustomModal: () => void;
+  onOpenCommunityModal: () => void;
 }
 
 export const DropdownMenu: React.FC<DropdownMenuProps> = ({
@@ -18,7 +19,8 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
   onOpenSessionFile,
   onOpenCatalogFile,
   onTogglePasteMode,
-  onOpenCustomModal
+  onOpenCustomModal,
+  onOpenCommunityModal
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -46,6 +48,23 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
       {showMenu && (
         <div className="absolute right-0 mt-2 w-72 bg-zinc-900/95 border border-zinc-800 rounded-2xl shadow-2xl backdrop-blur-xl z-50 p-2 text-xs flex flex-col gap-1 divide-y divide-zinc-800/60">
           <div className="px-3 py-1.5 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+            Calendriers & Partage
+          </div>
+
+          <div className="pt-1 flex flex-col gap-0.5">
+            <button
+              onClick={() => { onOpenCommunityModal(); setShowMenu(false); }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-violet-300 hover:bg-violet-500/10 transition text-left"
+            >
+              <Globe className="h-4 w-4 text-violet-400" />
+              <div>
+                <div className="font-semibold">Calendriers Communautaires</div>
+                <div className="text-[10px] text-zinc-400">Voir, créer et partager sur Hostinger</div>
+              </div>
+            </button>
+          </div>
+
+          <div className="px-3 pt-2.5 pb-1 text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
             Session & Sauvegarde
           </div>
 
@@ -102,7 +121,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
 
             <button
               onClick={() => { onOpenCustomModal(); setShowMenu(false); }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-violet-300 hover:bg-violet-500/10 transition text-left"
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-zinc-200 hover:bg-zinc-800 transition text-left"
             >
               <PlusCircle className="h-4 w-4 text-violet-400" />
               <div>

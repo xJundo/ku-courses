@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Category, Course, ProcessedCourse, SortOption } from '../types/course';
+import { Category, Course, ProcessedCourse, SortOption, CommunityCalendar } from '../types/course';
 import { FALLBACK_COURSES, CATEGORY_ORDER } from '../constants/schedule';
 import {
   autoClassify,
@@ -13,6 +13,7 @@ import {
 import { parseSchedule } from '../utils/scheduleUtils';
 import { loadLocalStorage, saveLocalStorage } from '../utils/storage';
 import { useLocalStorageState } from './useLocalStorage';
+import { calendarApi } from '../services/calendarApi';
 
 export function useCoursesData() {
   const [courses, setCourses] = useState<Course[]>(FALLBACK_COURSES);
@@ -21,6 +22,12 @@ export function useCoursesData() {
   const [ratings, setRatings] = useLocalStorageState<Record<string, number>>('ku_ratings', {});
   const [comments, setComments] = useLocalStorageState<Record<string, string>>('ku_comments', {});
   const [customCourses, setCustomCourses] = useLocalStorageState<Course[]>('ku_custom_courses', []);
+
+  // Community calendar state
+  const [activeCalendar, setActiveCalendar] = useState<CommunityCalendar | null>(null);
+  const [activeCalendarId, setActiveCalendarId] = useLocalStorageState<string | null>('ku_active_calendar_id', null);
+  const [showCommunityModal, setShowCommunityModal] = useState(false);
+  const [showCreateCalendarModal, setShowCreateCalendarModal] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showClosedExchange, setShowClosedExchange] = useState(false);
@@ -149,6 +156,154 @@ export function useCoursesData() {
     }
   }, [coursesWithSchedules]);
 
+  // Check URL query parameters or active calendar ID on startup
+  useEffect(() => {
+    if (coursesWithSchedules.length === 0) return;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlCalId = urlParams.get('calendar') || urlParams.get('c');
+
+    const targetId = urlCalId || activeCalendarId;
+    if (targetId) {
+      loadCalendarById(targetId);
+    }
+  }, [coursesWithSchedules.length]);
+
+  const loadCalendarById = async (id: string) => {
+    try {
+      const res = await calendarApi.getCalendar(id);
+      if (res.success && res.calendar) {
+        const cal = res.calendar;
+        setActiveCalendar(cal);
+        setActiveCalendarId(cal.id);
+
+        if (cal.categoryOverrides) setCategoryOverrides(cal.categoryOverrides);
+        if (cal.ratings) setRatings(cal.ratings);
+        if (cal.comments) setComments(cal.comments);
+        if (cal.customCourses && Array.isArray(cal.customCourses)) {
+          setCustomCourses(cal.customCourses);
+        }
+
+        if (Array.isArray(cal.selectedCourseKeys)) {
+          const keySet = new Set(cal.selectedCourseKeys);
+          const matched = coursesWithSchedules.filter(c => keySet.has(courseKey(c)));
+          setSelectedCourses(matched);
+        }
+
+        // Update URL parameter without reload
+        const url = new URL(window.location.href);
+        url.searchParams.set('calendar', cal.id);
+        window.history.pushState({}, '', url.toString());
+
+        setCatalogSource(`Calendrier communautaire : ${cal.name}`);
+        setImportSuccess(true);
+        setTimeout(() => setImportSuccess(false), 4000);
+      } else {
+        setJsonError(res.error || 'Calendrier introuvable');
+      }
+    } catch (err: any) {
+      setJsonError(`Impossible de charger le calendrier : ${err.message}`);
+    }
+  };
+
+  const saveActiveCalendar = async () => {
+    if (!activeCalendarId || !activeCalendar) return;
+
+    const totalCredits = selectedCourses.reduce((acc, c) => acc + c.creditsNum, 0);
+    const payload = {
+      name: activeCalendar.name,
+      author: activeCalendar.author,
+      description: activeCalendar.description,
+      selectedCourseKeys: selectedCourses.map(courseKey),
+      categoryOverrides,
+      ratings,
+      comments,
+      customCourses,
+      totalCredits
+    };
+
+    try {
+      const res = await calendarApi.updateCalendar(activeCalendarId, payload);
+      if (res.success && res.calendar) {
+        setActiveCalendar(res.calendar);
+        setCatalogSource(`Modifications enregistrées sur "${res.calendar.name}"`);
+        setImportSuccess(true);
+        setTimeout(() => setImportSuccess(false), 4000);
+      }
+    } catch (err: any) {
+      setJsonError(`Erreur d'enregistrement : ${err.message}`);
+    }
+  };
+
+  const createNewCalendar = async (
+    name: string,
+    author: string,
+    description: string,
+    copyCurrent: boolean
+  ) => {
+    const selectedCourseKeys = copyCurrent ? selectedCourses.map(courseKey) : [];
+    const totalCredits = copyCurrent ? selectedCourses.reduce((acc, c) => acc + c.creditsNum, 0) : 0;
+
+    try {
+      const res = await calendarApi.createCalendar({
+        name,
+        author: author || 'Étudiant',
+        description,
+        selectedCourseKeys,
+        categoryOverrides: copyCurrent ? categoryOverrides : {},
+        ratings: copyCurrent ? ratings : {},
+        comments: copyCurrent ? comments : {},
+        customCourses: copyCurrent ? customCourses : [],
+        totalCredits
+      });
+
+      if (res.success && res.calendar) {
+        const cal = res.calendar;
+        setActiveCalendar(cal);
+        setActiveCalendarId(cal.id);
+        if (!copyCurrent) {
+          setSelectedCourses([]);
+        }
+
+        // Update URL
+        const url = new URL(window.location.href);
+        url.searchParams.set('calendar', cal.id);
+        window.history.pushState({}, '', url.toString());
+
+        setShowCreateCalendarModal(false);
+        setShowCommunityModal(false);
+        setCatalogSource(`Nouveau calendrier publié : "${cal.name}"`);
+        setImportSuccess(true);
+        setTimeout(() => setImportSuccess(false), 5000);
+      }
+    } catch (err: any) {
+      setJsonError(`Erreur lors de la création du calendrier : ${err.message}`);
+    }
+  };
+
+  const duplicateCalendar = async (targetCal: CommunityCalendar) => {
+    try {
+      const res = await calendarApi.createCalendar({
+        name: `Copie de ${targetCal.name}`,
+        author: targetCal.author ? `${targetCal.author} (Copie)` : 'Étudiant',
+        description: targetCal.description || '',
+        selectedCourseKeys: targetCal.selectedCourseKeys || [],
+        categoryOverrides: targetCal.categoryOverrides || {},
+        ratings: targetCal.ratings || {},
+        comments: targetCal.comments || {},
+        customCourses: targetCal.customCourses || [],
+        totalCredits: targetCal.totalCredits || 0
+      });
+
+      if (res.success && res.calendar) {
+        await loadCalendarById(res.calendar.id);
+        setShowCommunityModal(false);
+      }
+    } catch (err: any) {
+      setJsonError(`Erreur lors de la duplication : ${err.message}`);
+    }
+  };
+
   const ratedCoursesCount = useMemo(() => {
     return coursesWithSchedules.filter(c => c.rating > 0 || (c.comment && c.comment.trim().length > 0)).length;
   }, [coursesWithSchedules]);
@@ -272,6 +427,16 @@ export function useCoursesData() {
     ratings,
     comments,
     customCourses,
+    activeCalendar,
+    activeCalendarId,
+    showCommunityModal,
+    setShowCommunityModal,
+    showCreateCalendarModal,
+    setShowCreateCalendarModal,
+    loadCalendarById,
+    saveActiveCalendar,
+    createNewCalendar,
+    duplicateCalendar,
     searchTerm,
     setSearchTerm,
     showClosedExchange,

@@ -223,6 +223,22 @@ export function useCoursesData() {
     [categoryOverrides, comments, customCourses, ratings, selectedCourses, setActiveCalendarId, totalCredits]
   );
 
+  /** Renames a calendar / updates its note, without touching its course selection. */
+  const updateCalendarMeta = useCallback(
+    async (id: string, name: string, description: string) => {
+      try {
+        const { calendar } = await calendarApi.update(id, { name, description });
+        if (activeCalendar?.id === calendar.id) setActiveCalendar(calendar);
+        toast.success(`« ${calendar.name} » mis à jour.`);
+        return calendar;
+      } catch (err) {
+        toast.error(errorMessage(err, 'Modification impossible.'));
+        return null;
+      }
+    },
+    [activeCalendar]
+  );
+
   /** Copies someone else's calendar into a new one owned by the current user. */
   const duplicateCalendar = useCallback(
     async (source: CommunityCalendar) => {
@@ -432,6 +448,7 @@ export function useCoursesData() {
     loadCalendarById,
     saveActiveCalendar,
     createNewCalendar,
+    updateCalendarMeta,
     duplicateCalendar,
     deleteCalendar,
     detachCalendar,

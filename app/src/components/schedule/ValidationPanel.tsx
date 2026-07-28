@@ -1,10 +1,4 @@
-import {
-  AlertTriangleIcon,
-  CheckCircleIcon,
-  InfoIcon,
-  SparklesIcon,
-  StarIcon
-} from 'lucide-react';
+import { AlertTriangleIcon, CheckCircleIcon, InfoIcon, StarIcon } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,7 +37,6 @@ interface ValidationPanelProps {
   loadingCatalog: boolean;
   jsonError: string | null;
   catalogSource: string;
-  optimizeInfo: string | null;
   ratedCoursesCount: number;
   selectedStats: SelectedStats;
   validationDetails: ValidationDetails;
@@ -53,7 +46,6 @@ export function ValidationPanel({
   loadingCatalog,
   jsonError,
   catalogSource,
-  optimizeInfo,
   ratedCoursesCount,
   selectedStats,
   validationDetails
@@ -74,14 +66,6 @@ export function ValidationPanel({
           <AlertTriangleIcon />
           <AlertTitle>Problème de chargement</AlertTitle>
           <AlertDescription>{jsonError}</AlertDescription>
-        </Alert>
-      )}
-
-      {optimizeInfo && (
-        <Alert>
-          <SparklesIcon />
-          <AlertTitle>Optimisation auto</AlertTitle>
-          <AlertDescription>{optimizeInfo}</AlertDescription>
         </Alert>
       )}
 

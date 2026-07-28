@@ -7,6 +7,7 @@ import {
   DownloadIcon,
   GlobeIcon,
   MessagesSquareIcon,
+  PencilIcon,
   PlusIcon,
   RefreshCwIcon,
   SaveIcon,
@@ -42,6 +43,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ApiError, calendarApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import type { CalendarSummary, CommunityCalendar } from '@/types/course';
+import { EditCalendarDialog } from './EditCalendarDialog';
 
 interface CommunityCalendarsDialogProps {
   open: boolean;
@@ -52,6 +54,7 @@ interface CommunityCalendarsDialogProps {
   onOpenCreate: () => void;
   onSaveActive: () => void;
   onDuplicate: (calendar: CommunityCalendar) => Promise<unknown>;
+  onUpdateMeta: (id: string, name: string, description: string) => Promise<unknown>;
   onDelete: (id: string) => Promise<boolean>;
   onRequireAuth: () => void;
 }
@@ -74,6 +77,7 @@ export function CommunityCalendarsDialog({
   onOpenCreate,
   onSaveActive,
   onDuplicate,
+  onUpdateMeta,
   onDelete,
   onRequireAuth
 }: CommunityCalendarsDialogProps) {
@@ -83,6 +87,7 @@ export function CommunityCalendarsDialog({
   const [query, setQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<CalendarSummary | null>(null);
+  const [editing, setEditing] = useState<CalendarSummary | null>(null);
 
   const fetchList = useCallback(async () => {
     setLoading(true);
@@ -125,6 +130,12 @@ export function CommunityCalendarsDialog({
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Duplication impossible.');
     }
+  };
+
+  const handleSaveMeta = async (id: string, name: string, description: string) => {
+    const updated = await onUpdateMeta(id, name, description);
+    if (updated) await fetchList();
+    return updated;
   };
 
   const confirmDelete = async () => {
@@ -307,22 +318,33 @@ export function CommunityCalendarsDialog({
 
                         <Button
                           variant="outline"
-                          size="icon-sm"
-                          aria-label="Dupliquer ce calendrier"
+                          size="sm"
                           onClick={() => void handleDuplicate(calendar)}
                         >
-                          <CopyIcon />
+                          <CopyIcon data-icon="inline-start" />
+                          Dupliquer
                         </Button>
 
                         {calendar.isOwner && (
-                          <Button
-                            variant="destructive"
-                            size="icon-sm"
-                            aria-label="Supprimer ce calendrier"
-                            onClick={() => setPendingDelete(calendar)}
-                          >
-                            <Trash2Icon />
-                          </Button>
+                          <>
+                            <Button
+                              variant="outline"
+                              size="icon-sm"
+                              aria-label="Renommer ce calendrier / modifier sa note"
+                              onClick={() => setEditing(calendar)}
+                            >
+                              <PencilIcon />
+                            </Button>
+
+                            <Button
+                              variant="destructive"
+                              size="icon-sm"
+                              aria-label="Supprimer ce calendrier"
+                              onClick={() => setPendingDelete(calendar)}
+                            >
+                              <Trash2Icon />
+                            </Button>
+                          </>
                         )}
 
                         {!isActive && (
@@ -340,6 +362,12 @@ export function CommunityCalendarsDialog({
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      <EditCalendarDialog
+        calendar={editing}
+        onOpenChange={next => !next && setEditing(null)}
+        onSave={handleSaveMeta}
+      />
 
       <AlertDialog open={Boolean(pendingDelete)} onOpenChange={next => !next && setPendingDelete(null)}>
         <AlertDialogContent>

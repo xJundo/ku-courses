@@ -81,7 +81,7 @@ export function CreateCalendarDialog({
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="calendar-description">Description (optionnel)</FieldLabel>
+              <FieldLabel htmlFor="calendar-description">Note (optionnel)</FieldLabel>
               <Textarea
                 id="calendar-description"
                 rows={2}

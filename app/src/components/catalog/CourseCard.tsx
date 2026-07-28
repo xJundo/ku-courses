@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import {
   ExternalLinkIcon,
   MessageSquareIcon,
@@ -27,7 +28,10 @@ interface CourseCardProps {
   onOpenDetails: (course: ProcessedCourse) => void;
 }
 
-export function CourseCard({
+// Memoised: the catalog renders many of these at once, so unrelated state
+// changes (theme, dialogs, active calendar) must not re-render the whole grid.
+// Every callback prop is stable via useCallback in useCoursesData.
+export const CourseCard = memo(function CourseCard({
   course,
   isSelected,
   discussionCount,
@@ -196,4 +200,4 @@ export function CourseCard({
       </CardFooter>
     </Card>
   );
-}
+});

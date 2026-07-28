@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { FilterIcon, SearchIcon, SlidersIcon, StarIcon } from 'lucide-react';
 import { CourseCard } from './CourseCard';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { Field, FieldLabel } from '@/components/ui/field';
@@ -20,6 +22,9 @@ import { CATEGORY_COLORS } from '@/constants/schedule';
 import { cn } from '@/lib/utils';
 import type { CommentThreads, ProcessedCourse, SortOption } from '@/types/course';
 import { courseKey } from '@/utils/courseUtils';
+
+/** How many cards to add to the grid per "show more" click. */
+const PAGE_SIZE = 40;
 
 const TABS: { value: string; label: string; category?: keyof typeof CATEGORY_COLORS }[] = [
   { value: 'all', label: 'Tous' },
@@ -71,6 +76,20 @@ export function CourseCatalog({
   onOpenDetails
 }: CourseCatalogProps) {
   const selectedKeys = new Set(selectedCourses.map(courseKey));
+
+  // The full catalog is ~1500 courses and a filter can still match hundreds.
+  // Rendering them all makes every keystroke and theme change cost seconds, so
+  // the grid grows on demand instead.
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  // Any filter/sort change produces a new array identity — start over from the
+  // top so the user never lands mid-way through a previous result set.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filteredCoursesList]);
+
+  const visibleCourses = filteredCoursesList.slice(0, visibleCount);
+  const remainingCount = filteredCoursesList.length - visibleCourses.length;
 
   return (
     <Card>
@@ -173,7 +192,7 @@ export function CourseCatalog({
           // containers, which every Card is (`overflow-hidden`).
           <ScrollArea className="h-[600px]">
             <div className="grid grid-cols-1 gap-4 pr-3 md:grid-cols-2">
-              {filteredCoursesList.map(course => {
+              {visibleCourses.map(course => {
                 const key = courseKey(course);
                 return (
                   <CourseCard
@@ -189,6 +208,21 @@ export function CourseCatalog({
                 );
               })}
             </div>
+
+            {remainingCount > 0 && (
+              <div className="flex flex-col items-center gap-1.5 py-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisibleCount(count => count + PAGE_SIZE)}
+                >
+                  Afficher {Math.min(remainingCount, PAGE_SIZE)} cours de plus
+                </Button>
+                <span className="text-muted-foreground text-[11px]">
+                  {visibleCourses.length} sur {filteredCoursesList.length} affichés
+                </span>
+              </div>
+            )}
           </ScrollArea>
         ) : (
           <Empty>

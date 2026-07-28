@@ -168,7 +168,8 @@ cd app
 npm install
 
 # Terminal 1 — API (needs a reachable Postgres; `docker compose up -d db` is enough)
-DATABASE_URL=postgres://ku:<password>@localhost:5432/ku_scheduler npm run dev:server
+POSTGRES_HOST=localhost POSTGRES_USER=ku POSTGRES_PASSWORD=<password> POSTGRES_DB=ku_scheduler \
+  npm run dev:server
 
 # Terminal 2 — Vite dev server, proxies /api to localhost:3000
 npm run dev
@@ -186,16 +187,16 @@ To add a shadcn component: `npx shadcn@latest add <component>`.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `POSTGRES_USER` | no | `ku` | Postgres role. |
+| `POSTGRES_USER` | no | `ku` | Postgres role. Passed to both `db` and `app` as discrete fields — never concatenated into a URL, so any character in the password is safe. |
 | `POSTGRES_DB` | no | `ku_scheduler` | Database name. |
-| `POSTGRES_PASSWORD` | **yes** | — | Postgres password. Compose refuses to start without it. |
+| `POSTGRES_PASSWORD` | **yes** | — | Postgres password. Compose refuses to start without it. Any character is fine, including `/`, `@`, `#` from `openssl rand -base64`. |
 | `APP_PORT` | no | `3000` | Host port mapped to the app container. |
 | `JWT_SECRET` | **yes** in production | random in dev | Signs session cookies. Changing it logs everyone out. |
 | `SESSION_TTL_SECONDS` | no | `2592000` (30 d) | Session lifetime. |
 | `COOKIE_NAME` | no | `ku_session` | Session cookie name. |
 | `COOKIE_SECURE` | no | `false` | Set to `true` once served over HTTPS. |
 | `TRUST_PROXY` | no | `0` | Number of reverse proxies in front of the app. |
-| `DATABASE_URL` | no | local default | Full connection string (set by compose). |
+| `DATABASE_URL` | no | unset | Only for an external/managed Postgres — overrides the discrete `POSTGRES_*` fields with a full connection string. |
 
 ---
 

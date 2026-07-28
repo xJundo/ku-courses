@@ -6,7 +6,17 @@ import { config } from './config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export const pool = new pg.Pool({ connectionString: config.databaseUrl });
+export const pool = new pg.Pool(
+  config.database.connectionString
+    ? { connectionString: config.database.connectionString }
+    : {
+        host: config.database.host,
+        port: config.database.port,
+        user: config.database.user,
+        password: config.database.password,
+        database: config.database.database
+      }
+);
 
 pool.on('error', err => {
   console.error('[db] erreur inattendue sur un client Postgres inactif:', err);

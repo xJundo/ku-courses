@@ -1,108 +1,162 @@
-import React, { useRef } from 'react';
-import { CalendarDays, Sparkles, Globe, Save } from 'lucide-react';
-import { DropdownMenu } from './DropdownMenu';
-import { CommunityCalendar } from '../../types/course';
+import { useRef } from 'react';
+import type { ChangeEvent } from 'react';
+import {
+  CalendarDaysIcon,
+  ClipboardIcon,
+  DownloadIcon,
+  FileJsonIcon,
+  FolderOpenIcon,
+  GlobeIcon,
+  PlusCircleIcon,
+  SaveIcon,
+  SlidersIcon,
+  SparklesIcon
+} from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { ThemeToggle } from './ThemeToggle';
+import { UserMenu } from './UserMenu';
+import type { CommunityCalendar } from '@/types/course';
 
 interface HeaderProps {
-  onAutoOptimize: () => void;
-  showDropdownMenu: boolean;
-  setShowDropdownMenu: (show: boolean) => void;
-  onExportSession: () => void;
-  onCatalogFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onSessionFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onTogglePasteMode: () => void;
-  onOpenCustomModal: () => void;
   activeCalendar: CommunityCalendar | null;
-  onOpenCommunityModal: () => void;
+  onAutoOptimize: () => void;
+  onExportSession: () => void;
+  onCatalogFileUpload: (event: ChangeEvent<HTMLInputElement>) => void;
+  onSessionFileUpload: (event: ChangeEvent<HTMLInputElement>) => void;
+  onOpenPasteDialog: () => void;
+  onOpenCustomCourseDialog: () => void;
+  onOpenCommunity: () => void;
   onSaveActiveCalendar: () => void;
+  onOpenAuth: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({
+export function Header({
+  activeCalendar,
   onAutoOptimize,
-  showDropdownMenu,
-  setShowDropdownMenu,
   onExportSession,
   onCatalogFileUpload,
   onSessionFileUpload,
-  onTogglePasteMode,
-  onOpenCustomModal,
-  activeCalendar,
-  onOpenCommunityModal,
-  onSaveActiveCalendar
-}) => {
-  const catalogFileInputRef = useRef<HTMLInputElement>(null);
-  const sessionFileInputRef = useRef<HTMLInputElement>(null);
+  onOpenPasteDialog,
+  onOpenCustomCourseDialog,
+  onOpenCommunity,
+  onSaveActiveCalendar,
+  onOpenAuth
+}: HeaderProps) {
+  const catalogInputRef = useRef<HTMLInputElement>(null);
+  const sessionInputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <header className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+    <header className="bg-background/80 sticky top-0 z-40 border-b backdrop-blur-md">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-6">
         <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-tr from-violet-600 to-fuchsia-600 p-2.5 rounded-xl shadow-lg shadow-violet-900/20">
-            <CalendarDays className="h-6 w-6 text-white" />
+          <div className="bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-lg">
+            <CalendarDaysIcon className="size-5" />
           </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                KU Sejong Planificateur <span className="text-xs bg-violet-500/20 text-violet-400 border border-violet-500/30 px-2 py-0.5 rounded-full font-mono">Epitech Tech4</span>
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="font-heading text-base font-semibold tracking-tight">
+                KU Sejong Planificateur
               </h1>
               {activeCalendar && (
-                <button
-                  onClick={onOpenCommunityModal}
-                  className="flex items-center gap-1 text-xs bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-medium transition"
-                  title="Cliquer pour gérer les calendriers communautaires"
-                >
-                  <Globe className="h-3 w-3 text-emerald-400" />
-                  <span>{activeCalendar.name}</span>
-                </button>
+                <Badge variant="secondary" asChild>
+                  <button type="button" onClick={onOpenCommunity}>
+                    <GlobeIcon />
+                    {activeCalendar.name}
+                  </button>
+                </Badge>
               )}
             </div>
-            <p className="text-xs text-zinc-400">3 IT + 1 Business + 1 Coréen · Calendriers communautaires & partage Hostinger</p>
+            <p className="text-muted-foreground text-xs">
+              3 IT + 1 Business + 1 Coréen · Calendriers communautaires partagés
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap justify-end">
-          <button
-            onClick={onOpenCommunityModal}
-            className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-100 font-semibold text-xs px-3.5 py-2.5 rounded-xl transition duration-200 shadow-sm"
-          >
-            <Globe className="h-4 w-4 text-violet-400" />
-            <span>Calendriers Communautaires</span>
-          </button>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onOpenCommunity}>
+            <GlobeIcon data-icon="inline-start" />
+            Communauté
+          </Button>
 
-          {activeCalendar && (
-            <button
-              onClick={onSaveActiveCalendar}
-              title="Enregistrer les modifications de l'emploi du temps actuel"
-              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-3.5 py-2.5 rounded-xl transition duration-200 shadow-md shadow-emerald-950/40"
-            >
-              <Save className="h-4 w-4" />
-              <span>Sauvegarder</span>
-            </button>
+          {activeCalendar?.isOwner && (
+            <Button size="sm" onClick={onSaveActiveCalendar}>
+              <SaveIcon data-icon="inline-start" />
+              Sauvegarder
+            </Button>
           )}
 
-          <button
-            onClick={onAutoOptimize}
-            className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition duration-200 shadow-md shadow-violet-950/40"
-          >
-            <Sparkles className="h-4 w-4" />
-            <span>Optimisation Auto</span>
-          </button>
+          <Button variant="secondary" size="sm" onClick={onAutoOptimize}>
+            <SparklesIcon data-icon="inline-start" />
+            Optimisation auto
+          </Button>
 
-          <DropdownMenu
-            showMenu={showDropdownMenu}
-            setShowMenu={setShowDropdownMenu}
-            onExportSession={onExportSession}
-            onOpenSessionFile={() => sessionFileInputRef.current?.click()}
-            onOpenCatalogFile={() => catalogFileInputRef.current?.click()}
-            onTogglePasteMode={onTogglePasteMode}
-            onOpenCustomModal={onOpenCustomModal}
-            onOpenCommunityModal={onOpenCommunityModal}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <SlidersIcon data-icon="inline-start" />
+                Fichiers
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64">
+              <DropdownMenuLabel>Session & sauvegarde</DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuItem onClick={onExportSession}>
+                  <DownloadIcon />
+                  Exporter ma session (.json)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => sessionInputRef.current?.click()}>
+                  <FileJsonIcon />
+                  Restaurer une session (.json)
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Catalogue & cours</DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuItem onClick={() => catalogInputRef.current?.click()}>
+                  <FolderOpenIcon />
+                  Charger un catalogue (.json)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onOpenPasteDialog}>
+                  <ClipboardIcon />
+                  Coller du JSON
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onOpenCustomCourseDialog}>
+                  <PlusCircleIcon />
+                  Ajouter un cours sur-mesure
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <ThemeToggle />
+          <UserMenu onOpenAuth={onOpenAuth} />
+
+          <input
+            type="file"
+            ref={catalogInputRef}
+            onChange={onCatalogFileUpload}
+            accept=".json"
+            className="hidden"
           />
-
-          <input type="file" ref={catalogFileInputRef} onChange={onCatalogFileUpload} accept=".json" className="hidden" />
-          <input type="file" ref={sessionFileInputRef} onChange={onSessionFileUpload} accept=".json" className="hidden" />
+          <input
+            type="file"
+            ref={sessionInputRef}
+            onChange={onSessionFileUpload}
+            accept=".json"
+            className="hidden"
+          />
         </div>
       </div>
     </header>
   );
-};
+}

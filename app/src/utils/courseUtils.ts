@@ -40,11 +40,10 @@ export function getDifficultyLabel(level: number | null): string {
 }
 
 export function getDifficultyColor(level: number | null): string {
-  if (level === null) return 'bg-zinc-700';
-  if (level <= 2) return 'bg-emerald-500';
-  if (level === 3) return 'bg-amber-500';
-  if (level === 4) return 'bg-orange-500';
-  return 'bg-red-500';
+  if (level === null) return 'bg-muted-foreground/40';
+  if (level <= 2) return 'bg-success';
+  if (level === 3) return 'bg-warning';
+  return 'bg-destructive';
 }
 
 export function computePreferenceTags(course: {

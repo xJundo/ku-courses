@@ -1,40 +1,36 @@
-import React from 'react';
-import { Star } from 'lucide-react';
+import { StarIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface StarRatingProps {
   rating: number;
-  onRate?: (r: number) => void;
+  onRate?: (rating: number) => void;
   interactive?: boolean;
   size?: 'sm' | 'md';
 }
 
-export const StarRating: React.FC<StarRatingProps> = ({
-  rating,
-  onRate,
-  interactive = true,
-  size = 'sm'
-}) => {
-  const starSize = size === 'sm' ? 'h-3.5 w-3.5' : 'h-5 w-5';
+export function StarRating({ rating, onRate, interactive = true, size = 'sm' }: StarRatingProps) {
   return (
-    <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
+    <div className="flex items-center gap-0.5" onClick={event => event.stopPropagation()}>
       {[1, 2, 3, 4, 5].map(star => (
         <button
           key={star}
           type="button"
           disabled={!interactive}
-          onClick={() => onRate && onRate(star === rating ? 0 : star)}
-          className={`${interactive ? 'hover:scale-125 transition-transform p-0.5 focus:outline-none' : 'cursor-default'}`}
-          title={interactive ? (star === rating ? 'Supprimer la note' : `${star} étoile${star > 1 ? 's' : ''}`) : `${rating}/5 étoiles`}
+          onClick={() => onRate?.(star === rating ? 0 : star)}
+          aria-label={star === rating ? 'Retirer la note' : `Noter ${star} sur 5`}
+          className={cn(
+            'focus-visible:ring-ring/50 rounded-sm p-0.5 focus-visible:ring-[3px] focus-visible:outline-none',
+            interactive ? 'transition-transform hover:scale-115' : 'cursor-default'
+          )}
         >
-          <Star
-            className={`${starSize} ${
-              star <= rating
-                ? 'text-amber-400 fill-amber-400 drop-shadow-[0_0_4px_rgba(251,191,36,0.5)]'
-                : 'text-zinc-600 hover:text-amber-300'
-            }`}
+          <StarIcon
+            className={cn(
+              size === 'sm' ? 'size-3.5' : 'size-5',
+              star <= rating ? 'fill-warning text-warning' : 'text-muted-foreground/50'
+            )}
           />
         </button>
       ))}
     </div>
   );
-};
+}

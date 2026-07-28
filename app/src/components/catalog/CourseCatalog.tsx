@@ -1,13 +1,39 @@
-import React from 'react';
-import { Sliders, Search, ArrowUpDown, Filter, Star } from 'lucide-react';
-import { ProcessedCourse, SortOption } from '../../types/course';
+import { FilterIcon, SearchIcon, SlidersIcon, StarIcon } from 'lucide-react';
 import { CourseCard } from './CourseCard';
-import { courseKey } from '../../utils/courseUtils';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group';
+import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CATEGORY_COLORS } from '@/constants/schedule';
+import { cn } from '@/lib/utils';
+import type { CommentThreads, ProcessedCourse, SortOption } from '@/types/course';
+import { courseKey } from '@/utils/courseUtils';
+
+const TABS: { value: string; label: string; category?: keyof typeof CATEGORY_COLORS }[] = [
+  { value: 'all', label: 'Tous' },
+  { value: 'it', label: 'IT', category: 'IT' },
+  { value: 'business', label: 'Business', category: 'BUSINESS' },
+  { value: 'korean', label: 'Coréen', category: 'KOREAN' },
+  { value: 'others', label: 'Autre', category: 'OTHERS' }
+];
 
 interface CourseCatalogProps {
   filteredCoursesList: ProcessedCourse[];
   selectedCourses: ProcessedCourse[];
   ratedCoursesCount: number;
+  threads: CommentThreads;
   activeTab: string;
   setActiveTab: (tab: string) => void;
   searchTerm: string;
@@ -24,10 +50,11 @@ interface CourseCatalogProps {
   onOpenDetails: (course: ProcessedCourse) => void;
 }
 
-export const CourseCatalog: React.FC<CourseCatalogProps> = ({
+export function CourseCatalog({
   filteredCoursesList,
   selectedCourses,
   ratedCoursesCount,
+  threads,
   activeTab,
   setActiveTab,
   searchTerm,
@@ -42,145 +69,142 @@ export const CourseCatalog: React.FC<CourseCatalogProps> = ({
   onCycleCategory,
   onSetRating,
   onOpenDetails
-}) => {
+}: CourseCatalogProps) {
+  const selectedKeys = new Set(selectedCourses.map(courseKey));
+
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-xl flex flex-col gap-5">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-md font-bold text-white flex items-center gap-2">
-            <Sliders className="h-4 w-4 text-violet-400" />
-            <span>Catalogue des cours ({filteredCoursesList.length})</span>
-          </h2>
-          <p className="text-xs text-zinc-400 font-normal">Activez les cours souhaités et gérez vos notes & commentaires</p>
-        </div>
-
-        <div className="flex flex-wrap gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 w-full md:w-auto">
-          {['all', 'it', 'business', 'korean', 'others', 'rated'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`text-[11px] px-3 py-1.5 rounded-lg capitalize font-semibold transition flex items-center gap-1 ${activeTab === tab ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-            >
-              {tab === 'all' && 'Tous'}
-              {tab === 'it' && 'IT'}
-              {tab === 'business' && 'Business'}
-              {tab === 'korean' && 'Coréen'}
-              {tab === 'others' && 'Autre'}
-              {tab === 'rated' && (
-                <>
-                  <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                  <span>Notés ({ratedCoursesCount})</span>
-                </>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-4 top-3.5 h-4 w-4 text-zinc-500" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            placeholder="Filtrer par code, mot-clé, département, prof ou commentaire..."
-            className="w-full bg-zinc-950 text-xs text-zinc-100 pl-11 pr-4 py-3 rounded-2xl border border-zinc-800 focus:outline-none focus:ring-1 focus:ring-violet-500 transition"
-          />
-        </div>
-
-        <div className="flex items-center gap-2 bg-zinc-950 px-3 py-2 rounded-2xl border border-zinc-800 shrink-0">
-          <ArrowUpDown className="h-3.5 w-3.5 text-zinc-400" />
-          <span className="text-[11px] text-zinc-400 font-medium">Trier par :</span>
-          <select
-            value={sortBy}
-            onChange={e => setSortBy(e.target.value as any)}
-            className="bg-transparent text-xs text-zinc-100 font-medium focus:outline-none cursor-pointer"
-          >
-            <option value="default" className="bg-zinc-900 text-zinc-200">Ordre d'origine</option>
-            <option value="rating-desc" className="bg-zinc-900 text-zinc-200">⭐ Note (haute → basse)</option>
-            <option value="rating-asc" className="bg-zinc-900 text-zinc-200">⭐ Note (basse → haute)</option>
-            <option value="level-asc" className="bg-zinc-900 text-zinc-200">📊 Niveau (1 → 4+)</option>
-            <option value="level-desc" className="bg-zinc-900 text-zinc-200">📊 Niveau (4+ → 1)</option>
-            <option value="code" className="bg-zinc-900 text-zinc-200">Code de cours</option>
-            <option value="name" className="bg-zinc-900 text-zinc-200">Nom du cours</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-1">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowClosedExchange(!showClosedExchange)}
-            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-              showClosedExchange ? 'bg-violet-600' : 'bg-zinc-800'
-            }`}
-            role="switch"
-            aria-checked={showClosedExchange}
-          >
-            <span
-              aria-hidden="true"
-              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                showClosedExchange ? 'translate-x-4' : 'translate-x-0'
-              }`}
-            />
-          </button>
-          <span
-            className="text-xs text-zinc-300 font-medium cursor-pointer select-none"
-            onClick={() => setShowClosedExchange(!showClosedExchange)}
-          >
-            Afficher les cours fermés aux étudiants en échange
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowOnlyEnglish(!showOnlyEnglish)}
-            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-              showOnlyEnglish ? 'bg-indigo-600' : 'bg-zinc-800'
-            }`}
-            role="switch"
-            aria-checked={showOnlyEnglish}
-          >
-            <span
-              aria-hidden="true"
-              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                showOnlyEnglish ? 'translate-x-4' : 'translate-x-0'
-              }`}
-            />
-          </button>
-          <span
-            className="text-xs text-zinc-300 font-medium cursor-pointer select-none flex items-center gap-1.5"
-            onClick={() => setShowOnlyEnglish(!showOnlyEnglish)}
-          >
-            <span>Cours en anglais uniquement</span>
-            <span className="text-xs">🇬🇧</span>
-          </span>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[560px] overflow-y-auto pr-1">
-        {filteredCoursesList.length > 0 ? (
-          filteredCoursesList.map((course, idx) => (
-            <CourseCard
-              key={idx}
-              course={course}
-              isSelected={selectedCourses.some(sc => courseKey(sc) === courseKey(course))}
-              onToggle={onToggleCourse}
-              onCycleCategory={onCycleCategory}
-              onSetRating={onSetRating}
-              onOpenDetails={onOpenDetails}
-            />
-          ))
-        ) : (
-          <div className="col-span-full py-12 text-center flex flex-col items-center gap-2 text-zinc-500">
-            <Filter className="h-8 w-8 text-zinc-700 animate-pulse" />
-            <p className="text-xs">Aucun cours trouvé avec ces critères de recherche.</p>
+    <Card>
+      <CardHeader className="gap-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="flex flex-col gap-1">
+            <CardTitle className="flex items-center gap-2">
+              <SlidersIcon className="size-4" />
+              Catalogue des cours ({filteredCoursesList.length})
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Sélectionnez vos cours, notez-les et annotez-les.
+            </CardDescription>
           </div>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
+            <TabsList className="flex-wrap">
+              {TABS.map(tab => (
+                <TabsTrigger key={tab.value} value={tab.value}>
+                  {tab.category && (
+                    <span
+                      className={cn('size-2 rounded-full', CATEGORY_COLORS[tab.category].accent)}
+                      aria-hidden
+                    />
+                  )}
+                  {tab.label}
+                </TabsTrigger>
+              ))}
+              <TabsTrigger value="rated">
+                <StarIcon />
+                Notés ({ratedCoursesCount})
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      </CardHeader>
+
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center">
+          <InputGroup className="flex-1">
+            <InputGroupAddon>
+              <SearchIcon />
+            </InputGroupAddon>
+            <InputGroupInput
+              value={searchTerm}
+              onChange={event => setSearchTerm(event.target.value)}
+              placeholder="Code, mot-clé, département, professeur ou commentaire…"
+            />
+          </InputGroup>
+
+          <Field orientation="horizontal" className="md:w-auto">
+            <FieldLabel htmlFor="sort-by" className="text-muted-foreground shrink-0 text-xs">
+              Trier par
+            </FieldLabel>
+            <Select value={sortBy} onValueChange={value => setSortBy(value as SortOption)}>
+              <SelectTrigger id="sort-by" className="w-full md:w-52">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value="default">Ordre d’origine</SelectItem>
+                  <SelectItem value="rating-desc">Note (haute → basse)</SelectItem>
+                  <SelectItem value="rating-asc">Note (basse → haute)</SelectItem>
+                  <SelectItem value="level-asc">Niveau (1 → 4+)</SelectItem>
+                  <SelectItem value="level-desc">Niveau (4+ → 1)</SelectItem>
+                  <SelectItem value="code">Code de cours</SelectItem>
+                  <SelectItem value="name">Nom du cours</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </Field>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="show-closed"
+              checked={showClosedExchange}
+              onCheckedChange={setShowClosedExchange}
+            />
+            <Label htmlFor="show-closed" className="text-xs font-normal">
+              Afficher les cours fermés aux étudiants en échange
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="only-english"
+              checked={showOnlyEnglish}
+              onCheckedChange={setShowOnlyEnglish}
+            />
+            <Label htmlFor="only-english" className="text-xs font-normal">
+              Cours en anglais uniquement 🇬🇧
+            </Label>
+          </div>
+        </div>
+
+        {filteredCoursesList.length > 0 ? (
+          // The scroll container must wrap the grid rather than be the grid:
+          // a bounded-height grid collapses rows whose items are scroll
+          // containers, which every Card is (`overflow-hidden`).
+          <ScrollArea className="h-[600px]">
+            <div className="grid grid-cols-1 gap-4 pr-3 md:grid-cols-2">
+              {filteredCoursesList.map(course => {
+                const key = courseKey(course);
+                return (
+                  <CourseCard
+                    key={key}
+                    course={course}
+                    isSelected={selectedKeys.has(key)}
+                    discussionCount={threads[key]?.length ?? 0}
+                    onToggle={onToggleCourse}
+                    onCycleCategory={onCycleCategory}
+                    onSetRating={onSetRating}
+                    onOpenDetails={onOpenDetails}
+                  />
+                );
+              })}
+            </div>
+          </ScrollArea>
+        ) : (
+          <Empty>
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <FilterIcon />
+              </EmptyMedia>
+              <EmptyTitle>Aucun cours trouvé</EmptyTitle>
+              <EmptyDescription>
+                Aucun cours ne correspond à ces critères. Élargissez la recherche ou désactivez un
+                filtre.
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
-};
+}

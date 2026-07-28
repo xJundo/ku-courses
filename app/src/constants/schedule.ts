@@ -9,22 +9,33 @@ export const CATEGORY_LABELS: Record<Category, string> = {
 
 export const CATEGORY_ORDER: Category[] = ['IT', 'BUSINESS', 'KOREAN', 'OTHERS'];
 
-export const CATEGORY_COLORS: Record<Category, { bg: string; grid: string }> = {
-  KOREAN: {
-    bg: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
-    grid: 'bg-emerald-950/70 text-emerald-300 border-emerald-500/30 hover:bg-emerald-900/60'
-  },
+/**
+ * One secondary colour per course type, driven by the `--cat-*` tokens in
+ * index.css so both light and dark themes stay legible.
+ * - `badge`: tinted surface for pills and category chips
+ * - `grid`: timetable cell surface
+ * - `accent`: solid swatch (legend dots, left borders)
+ */
+export const CATEGORY_COLORS: Record<Category, { badge: string; grid: string; accent: string }> = {
   IT: {
-    bg: 'bg-violet-500/10 border-violet-500/20 text-violet-400',
-    grid: 'bg-violet-950/70 text-violet-300 border-violet-500/30 hover:bg-violet-900/60'
+    badge: 'bg-cat-it-soft text-cat-it-strong border-cat-it/30',
+    grid: 'bg-cat-it-soft text-cat-it-strong border-cat-it/40 hover:border-cat-it',
+    accent: 'bg-cat-it'
   },
   BUSINESS: {
-    bg: 'bg-amber-500/10 border-amber-500/20 text-amber-400',
-    grid: 'bg-amber-950/70 text-amber-300 border-amber-500/30 hover:bg-amber-900/60'
+    badge: 'bg-cat-business-soft text-cat-business-strong border-cat-business/30',
+    grid: 'bg-cat-business-soft text-cat-business-strong border-cat-business/40 hover:border-cat-business',
+    accent: 'bg-cat-business'
+  },
+  KOREAN: {
+    badge: 'bg-cat-korean-soft text-cat-korean-strong border-cat-korean/30',
+    grid: 'bg-cat-korean-soft text-cat-korean-strong border-cat-korean/40 hover:border-cat-korean',
+    accent: 'bg-cat-korean'
   },
   OTHERS: {
-    bg: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
-    grid: 'bg-blue-950/70 text-blue-300 border-blue-500/30 hover:bg-blue-900/60'
+    badge: 'bg-cat-others-soft text-cat-others-strong border-cat-others/30',
+    grid: 'bg-cat-others-soft text-cat-others-strong border-cat-others/40 hover:border-cat-others',
+    accent: 'bg-cat-others'
   }
 };
 

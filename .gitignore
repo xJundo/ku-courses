@@ -7,3 +7,5 @@ ku_sejong_epitech_scheduler.tsx
 ku_sejong_epitech_scheduler.tsx:Zone.Identifier
 dist
 cache
+.env
+app/data

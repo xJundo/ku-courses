@@ -1,7 +1,6 @@
 export type Category = 'IT' | 'BUSINESS' | 'KOREAN' | 'OTHERS';
 export type SortOption = 'default' | 'rating-desc' | 'rating-asc' | 'level-asc' | 'level-desc' | 'code' | 'name';
 
-
 export interface RawCourse {
   COUR_CD?: string;
   COUR_NM?: string;
@@ -104,21 +103,62 @@ export interface SessionBackup {
   customCourses: Course[];
 }
 
+/** Signed-in account. */
+export interface AuthUser {
+  id: string;
+  email: string;
+  displayName: string;
+}
+
+/** Row shown in the community list. */
+export interface CalendarSummary {
+  id: string;
+  name: string;
+  author: string;
+  ownerId: string | null;
+  isOwner: boolean;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  courseCount: number;
+  totalCredits: number;
+  commentCount: number;
+}
+
+/**
+ * `notes` holds the owner's private per-course notes (previously `comments`).
+ * Public discussion lives in `CourseComment` threads instead.
+ */
 export interface CommunityCalendar {
   id: string;
   name: string;
   author: string;
-  description?: string;
+  ownerId: string | null;
+  isOwner: boolean;
+  description: string;
   createdAt: string;
   updatedAt: string;
   selectedCourseKeys: string[];
   categoryOverrides: Record<string, Category>;
   ratings: Record<string, number>;
-  comments: Record<string, string>;
+  notes: Record<string, string>;
   customCourses: Course[];
-  courseCount?: number;
-  totalCredits?: number;
+  courseCount: number;
+  totalCredits: number;
 }
+
+/** One message in a per-course discussion thread. */
+export interface CourseComment {
+  id: string;
+  courseKey: string;
+  author: string;
+  authorId: string | null;
+  body: string;
+  createdAt: string;
+  canDelete: boolean;
+}
+
+export type CommentThreads = Record<string, CourseComment[]>;
 
 export interface CustomCourseFormData {
   COUR_CD: string;
@@ -133,4 +173,3 @@ export interface CustomCourseFormData {
   ROOM: string;
   ENG_YN: string;
 }
-

@@ -1,6 +1,14 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Category, Course, ProcessedCourse, SortOption, CommunityCalendar } from '../types/course';
-import { FALLBACK_COURSES, CATEGORY_ORDER } from '../constants/schedule';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { CATEGORY_ORDER, FALLBACK_COURSES } from '@/constants/schedule';
+import { ApiError, calendarApi } from '@/lib/api';
+import type {
+  Category,
+  CommunityCalendar,
+  Course,
+  ProcessedCourse,
+  SortOption
+} from '@/types/course';
 import {
   autoClassify,
   computePreferenceTags,
@@ -9,25 +17,26 @@ import {
   getDifficultyLevel,
   normalizeRow,
   processJsonPayload
-} from '../utils/courseUtils';
-import { parseSchedule } from '../utils/scheduleUtils';
-import { loadLocalStorage, saveLocalStorage } from '../utils/storage';
+} from '@/utils/courseUtils';
+import { parseSchedule } from '@/utils/scheduleUtils';
+import { loadLocalStorage, saveLocalStorage } from '@/utils/storage';
 import { useLocalStorageState } from './useLocalStorage';
-import { calendarApi } from '../services/calendarApi';
+
+function errorMessage(err: unknown, fallback: string) {
+  return err instanceof ApiError ? err.message : fallback;
+}
 
 export function useCoursesData() {
   const [courses, setCourses] = useState<Course[]>(FALLBACK_COURSES);
   const [selectedCourses, setSelectedCourses] = useState<ProcessedCourse[]>([]);
   const [categoryOverrides, setCategoryOverrides] = useLocalStorageState<Record<string, Category>>('ku_cat_overrides', {});
   const [ratings, setRatings] = useLocalStorageState<Record<string, number>>('ku_ratings', {});
+  // Private per-course notes of the current session (published as `notes`).
   const [comments, setComments] = useLocalStorageState<Record<string, string>>('ku_comments', {});
   const [customCourses, setCustomCourses] = useLocalStorageState<Course[]>('ku_custom_courses', []);
 
-  // Community calendar state
   const [activeCalendar, setActiveCalendar] = useState<CommunityCalendar | null>(null);
   const [activeCalendarId, setActiveCalendarId] = useLocalStorageState<string | null>('ku_active_calendar_id', null);
-  const [showCommunityModal, setShowCommunityModal] = useState(false);
-  const [showCreateCalendarModal, setShowCreateCalendarModal] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showClosedExchange, setShowClosedExchange] = useState(false);
@@ -35,20 +44,14 @@ export function useCoursesData() {
   const [activeTab, setActiveTab] = useState('all');
   const [sortBy, setSortBy] = useState<SortOption>('default');
   const [jsonError, setJsonError] = useState<string | null>(null);
-  const [importSuccess, setImportSuccess] = useState(false);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [catalogSource, setCatalogSource] = useState('secours (intégré)');
 
-  // Persistence of selected course keys
   useEffect(() => {
-    if (selectedCourses.length > 0) {
-      saveLocalStorage('ku_selected_keys', selectedCourses.map(courseKey));
-    } else {
-      saveLocalStorage('ku_selected_keys', []);
-    }
+    saveLocalStorage('ku_selected_keys', selectedCourses.map(courseKey));
   }, [selectedCourses]);
 
-  // Automatic catalog loading on init
+  // Automatic catalog loading on init.
   useEffect(() => {
     fetch('/courses.json')
       .then(res => {
@@ -57,299 +60,294 @@ export function useCoursesData() {
       })
       .then(data => {
         const rows = Array.isArray(data) ? data : data.rows || [];
-        const normalized = rows.map(normalizeRow).filter((r: any) => r.COUR_CD);
+        const normalized = rows.map(normalizeRow).filter((row: any) => row.COUR_CD);
         if (normalized.length > 0) {
-          const combined = [...customCourses, ...normalized];
-          setCourses(combined);
-          setCatalogSource(`courses.json (${normalized.length} cours, Fall 2026)`);
-
-          const savedKeys = loadLocalStorage<string[]>('ku_selected_keys', []);
-          if (savedKeys.length > 0) {
-            const keySet = new Set(savedKeys);
-            const restoreSelected = combined.filter(c => keySet.has(courseKey(c)));
-            if (restoreSelected.length > 0) {
-              // We'll process them to full ProcessedCourse later
-            }
-          }
+          setCourses([...customCourses, ...normalized]);
+          setCatalogSource(`courses.json (${normalized.length} cours)`);
         }
       })
       .catch(() => {
-        const combined = [...customCourses, ...FALLBACK_COURSES];
-        setCourses(combined);
-        setJsonError("Impossible de charger public/courses.json automatiquement — le catalogue de secours (3 cours) est utilisé.");
+        setCourses([...customCourses, ...FALLBACK_COURSES]);
+        setJsonError(
+          'Impossible de charger public/courses.json — le catalogue de secours (3 cours) est utilisé.'
+        );
       })
       .finally(() => setLoadingCatalog(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot bootstrap
   }, []);
 
-  const getEffectiveCategory = (c: Course): Category => {
-    const override = categoryOverrides[courseKey(c)];
-    return override || autoClassify(c);
-  };
+  const getEffectiveCategory = useCallback(
+    (course: Course): Category => categoryOverrides[courseKey(course)] || autoClassify(course),
+    [categoryOverrides]
+  );
 
-  const cycleCategory = (c: ProcessedCourse) => {
-    const current = getEffectiveCategory(c);
-    const idx = CATEGORY_ORDER.indexOf(current);
-    const next = CATEGORY_ORDER[(idx + 1) % CATEGORY_ORDER.length];
-    setCategoryOverrides(prev => ({ ...prev, [courseKey(c)]: next }));
-  };
+  const coursesBase = useMemo(
+    () =>
+      courses.map(course => ({
+        ...course,
+        category: getEffectiveCategory(course),
+        college: getCollege(course.DEPARTMENT),
+        difficultyLevel: getDifficultyLevel(course.COUR_CD),
+        parsedSchedules: parseSchedule(course.TIME_ROOM),
+        creditsNum: parseFloat(course.CREDIT) || 0,
+        ...computePreferenceTags(course)
+      })),
+    [courses, getEffectiveCategory]
+  );
 
-  const handleSetRating = (c: ProcessedCourse, rating: number) => {
-    const key = courseKey(c);
-    setRatings(prev => {
-      const next = { ...prev };
-      if (rating <= 0) delete next[key];
-      else next[key] = rating;
-      return next;
-    });
-  };
+  const coursesWithSchedules: ProcessedCourse[] = useMemo(
+    () =>
+      coursesBase.map(course => {
+        const key = courseKey(course);
+        return { ...course, rating: ratings[key] || 0, comment: comments[key] || '' };
+      }),
+    [coursesBase, ratings, comments]
+  );
 
-  const handleSetComment = (c: ProcessedCourse, comment: string) => {
-    const key = courseKey(c);
-    setComments(prev => {
-      const next = { ...prev };
-      if (!comment.trim()) delete next[key];
-      else next[key] = comment;
-      return next;
-    });
-  };
-
-  const coursesBase = useMemo(() => {
-    return courses.map(c => {
-      const category = getEffectiveCategory(c);
-      const college = getCollege(c.DEPARTMENT);
-      const difficultyLevel = getDifficultyLevel(c.COUR_CD);
-      const parsedSchedules = parseSchedule(c.TIME_ROOM);
-      const creditsNum = parseFloat(c.CREDIT) || 0;
-      const tags = computePreferenceTags(c);
-      return {
-        ...c,
-        category,
-        college,
-        difficultyLevel,
-        parsedSchedules,
-        creditsNum,
-        ...tags
-      };
-    });
-  }, [courses, categoryOverrides]);
-
-  const coursesWithSchedules: ProcessedCourse[] = useMemo(() => {
-    return coursesBase.map(c => {
-      const key = courseKey(c);
-      const rating = ratings[key] || 0;
-      const comment = comments[key] || '';
-      return { ...c, rating, comment };
-    });
-  }, [coursesBase, ratings, comments]);
-
-  // Restore selected courses once coursesWithSchedules is populated
+  // Restore the previous selection once the catalog is available.
   useEffect(() => {
-    if (selectedCourses.length === 0) {
-      const savedKeys = loadLocalStorage<string[]>('ku_selected_keys', []);
-      if (savedKeys.length > 0 && coursesWithSchedules.length > 0) {
-        const keySet = new Set(savedKeys);
-        const restoreSelected = coursesWithSchedules.filter(c => keySet.has(courseKey(c)));
-        if (restoreSelected.length > 0) {
-          setSelectedCourses(restoreSelected);
-        }
-      }
-    }
+    if (selectedCourses.length > 0 || coursesWithSchedules.length === 0) return;
+    const savedKeys = loadLocalStorage<string[]>('ku_selected_keys', []);
+    if (savedKeys.length === 0) return;
+
+    const keySet = new Set(savedKeys);
+    const restored = coursesWithSchedules.filter(course => keySet.has(courseKey(course)));
+    if (restored.length > 0) setSelectedCourses(restored);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the catalog lands
   }, [coursesWithSchedules]);
 
-  // Check URL query parameters or active calendar ID on startup
-  useEffect(() => {
-    if (coursesWithSchedules.length === 0) return;
+  const loadCalendarById = useCallback(
+    async (id: string, options: { silent?: boolean } = {}) => {
+      try {
+        const { calendar } = await calendarApi.get(id);
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlCalId = urlParams.get('calendar') || urlParams.get('c');
-
-    const targetId = urlCalId || activeCalendarId;
-    if (targetId) {
-      loadCalendarById(targetId);
-    }
-  }, [coursesWithSchedules.length]);
-
-  const loadCalendarById = async (id: string) => {
-    try {
-      const res = await calendarApi.getCalendar(id);
-      if (res.success && res.calendar) {
-        const cal = res.calendar;
-        setActiveCalendar(cal);
-        setActiveCalendarId(cal.id);
-
-        if (cal.categoryOverrides) setCategoryOverrides(cal.categoryOverrides);
-        if (cal.ratings) setRatings(cal.ratings);
-        if (cal.comments) setComments(cal.comments);
-        if (cal.customCourses && Array.isArray(cal.customCourses)) {
-          setCustomCourses(cal.customCourses);
+        setActiveCalendar(calendar);
+        setActiveCalendarId(calendar.id);
+        setCategoryOverrides(calendar.categoryOverrides || {});
+        setRatings(calendar.ratings || {});
+        setComments(calendar.notes || {});
+        if (Array.isArray(calendar.customCourses) && calendar.customCourses.length > 0) {
+          setCustomCourses(calendar.customCourses);
+          setCourses(prev => {
+            const existing = new Set(prev.map(courseKey));
+            const extra = calendar.customCourses.filter(course => !existing.has(courseKey(course)));
+            return extra.length > 0 ? [...extra, ...prev] : prev;
+          });
         }
 
-        if (Array.isArray(cal.selectedCourseKeys)) {
-          const keySet = new Set(cal.selectedCourseKeys);
-          const matched = coursesWithSchedules.filter(c => keySet.has(courseKey(c)));
-          setSelectedCourses(matched);
-        }
+        const keySet = new Set(calendar.selectedCourseKeys || []);
+        setSelectedCourses(coursesWithSchedules.filter(course => keySet.has(courseKey(course))));
 
-        // Update URL parameter without reload
         const url = new URL(window.location.href);
-        url.searchParams.set('calendar', cal.id);
-        window.history.pushState({}, '', url.toString());
+        url.searchParams.set('calendar', calendar.id);
+        window.history.replaceState({}, '', url.toString());
 
-        setCatalogSource(`Calendrier communautaire : ${cal.name}`);
-        setImportSuccess(true);
-        setTimeout(() => setImportSuccess(false), 4000);
-      } else {
-        setJsonError(res.error || 'Calendrier introuvable');
+        if (!options.silent) toast.success(`Calendrier « ${calendar.name} » chargé.`);
+        return calendar;
+      } catch (err) {
+        // A stale id in localStorage or in the URL should not block startup.
+        if (err instanceof ApiError && err.status === 404) {
+          setActiveCalendar(null);
+          setActiveCalendarId(null);
+        }
+        if (!options.silent) toast.error(errorMessage(err, 'Chargement du calendrier impossible.'));
+        return null;
       }
-    } catch (err: any) {
-      setJsonError(`Impossible de charger le calendrier : ${err.message}`);
-    }
-  };
+    },
+    [coursesWithSchedules, setActiveCalendarId, setCategoryOverrides, setComments, setCustomCourses, setRatings]
+  );
 
-  const saveActiveCalendar = async () => {
-    if (!activeCalendarId || !activeCalendar) return;
+  // Resolve a calendar from the URL (?calendar=) or the last one used.
+  const [bootstrapped, setBootstrapped] = useState(false);
+  useEffect(() => {
+    if (bootstrapped || coursesWithSchedules.length === 0) return;
+    setBootstrapped(true);
 
-    const totalCredits = selectedCourses.reduce((acc, c) => acc + c.creditsNum, 0);
-    const payload = {
-      name: activeCalendar.name,
-      author: activeCalendar.author,
-      description: activeCalendar.description,
-      selectedCourseKeys: selectedCourses.map(courseKey),
-      categoryOverrides,
-      ratings,
-      comments,
-      customCourses,
-      totalCredits
-    };
+    const params = new URLSearchParams(window.location.search);
+    const targetId = params.get('calendar') || params.get('c') || activeCalendarId;
+    if (targetId) void loadCalendarById(targetId, { silent: true });
+  }, [bootstrapped, coursesWithSchedules.length, activeCalendarId, loadCalendarById]);
 
+  const totalCredits = useMemo(
+    () => selectedCourses.reduce((acc, course) => acc + course.creditsNum, 0),
+    [selectedCourses]
+  );
+
+  const saveActiveCalendar = useCallback(async () => {
+    if (!activeCalendar?.isOwner) return;
     try {
-      const res = await calendarApi.updateCalendar(activeCalendarId, payload);
-      if (res.success && res.calendar) {
-        setActiveCalendar(res.calendar);
-        setCatalogSource(`Modifications enregistrées sur "${res.calendar.name}"`);
-        setImportSuccess(true);
-        setTimeout(() => setImportSuccess(false), 4000);
-      }
-    } catch (err: any) {
-      setJsonError(`Erreur d'enregistrement : ${err.message}`);
-    }
-  };
-
-  const createNewCalendar = async (
-    name: string,
-    author: string,
-    description: string,
-    copyCurrent: boolean
-  ) => {
-    const selectedCourseKeys = copyCurrent ? selectedCourses.map(courseKey) : [];
-    const totalCredits = copyCurrent ? selectedCourses.reduce((acc, c) => acc + c.creditsNum, 0) : 0;
-
-    try {
-      const res = await calendarApi.createCalendar({
-        name,
-        author: author || 'Étudiant',
-        description,
-        selectedCourseKeys,
-        categoryOverrides: copyCurrent ? categoryOverrides : {},
-        ratings: copyCurrent ? ratings : {},
-        comments: copyCurrent ? comments : {},
-        customCourses: copyCurrent ? customCourses : [],
+      const { calendar } = await calendarApi.update(activeCalendar.id, {
+        selectedCourseKeys: selectedCourses.map(courseKey),
+        categoryOverrides,
+        ratings,
+        notes: comments,
+        customCourses,
         totalCredits
       });
+      setActiveCalendar(calendar);
+      toast.success(`Modifications enregistrées sur « ${calendar.name} ».`);
+    } catch (err) {
+      toast.error(errorMessage(err, "Erreur lors de l'enregistrement."));
+    }
+  }, [activeCalendar, categoryOverrides, comments, customCourses, ratings, selectedCourses, totalCredits]);
 
-      if (res.success && res.calendar) {
-        const cal = res.calendar;
-        setActiveCalendar(cal);
-        setActiveCalendarId(cal.id);
-        if (!copyCurrent) {
-          setSelectedCourses([]);
-        }
+  const createNewCalendar = useCallback(
+    async (name: string, description: string, copyCurrent: boolean) => {
+      try {
+        const { calendar } = await calendarApi.create({
+          name,
+          description,
+          selectedCourseKeys: copyCurrent ? selectedCourses.map(courseKey) : [],
+          categoryOverrides: copyCurrent ? categoryOverrides : {},
+          ratings: copyCurrent ? ratings : {},
+          notes: copyCurrent ? comments : {},
+          customCourses: copyCurrent ? customCourses : [],
+          totalCredits: copyCurrent ? totalCredits : 0
+        });
 
-        // Update URL
+        setActiveCalendar(calendar);
+        setActiveCalendarId(calendar.id);
+        if (!copyCurrent) setSelectedCourses([]);
+
         const url = new URL(window.location.href);
-        url.searchParams.set('calendar', cal.id);
-        window.history.pushState({}, '', url.toString());
+        url.searchParams.set('calendar', calendar.id);
+        window.history.replaceState({}, '', url.toString());
 
-        setShowCreateCalendarModal(false);
-        setShowCommunityModal(false);
-        setCatalogSource(`Nouveau calendrier publié : "${cal.name}"`);
-        setImportSuccess(true);
-        setTimeout(() => setImportSuccess(false), 5000);
+        toast.success(`« ${calendar.name} » est publié sur les calendriers communautaires.`);
+        return calendar;
+      } catch (err) {
+        toast.error(errorMessage(err, 'Erreur lors de la création du calendrier.'));
+        return null;
       }
-    } catch (err: any) {
-      setJsonError(`Erreur lors de la création du calendrier : ${err.message}`);
-    }
-  };
+    },
+    [categoryOverrides, comments, customCourses, ratings, selectedCourses, setActiveCalendarId, totalCredits]
+  );
 
-  const duplicateCalendar = async (targetCal: CommunityCalendar) => {
-    try {
-      const res = await calendarApi.createCalendar({
-        name: `Copie de ${targetCal.name}`,
-        author: targetCal.author ? `${targetCal.author} (Copie)` : 'Étudiant',
-        description: targetCal.description || '',
-        selectedCourseKeys: targetCal.selectedCourseKeys || [],
-        categoryOverrides: targetCal.categoryOverrides || {},
-        ratings: targetCal.ratings || {},
-        comments: targetCal.comments || {},
-        customCourses: targetCal.customCourses || [],
-        totalCredits: targetCal.totalCredits || 0
+  /** Copies someone else's calendar into a new one owned by the current user. */
+  const duplicateCalendar = useCallback(
+    async (source: CommunityCalendar) => {
+      try {
+        const { calendar } = await calendarApi.create({
+          name: `Copie de ${source.name}`,
+          description: source.description || '',
+          selectedCourseKeys: source.selectedCourseKeys || [],
+          categoryOverrides: source.categoryOverrides || {},
+          ratings: source.ratings || {},
+          notes: source.notes || {},
+          customCourses: source.customCourses || [],
+          totalCredits: source.totalCredits || 0
+        });
+        await loadCalendarById(calendar.id, { silent: true });
+        toast.success(`Copie créée : « ${calendar.name} ».`);
+        return calendar;
+      } catch (err) {
+        toast.error(errorMessage(err, 'Erreur lors de la duplication.'));
+        return null;
+      }
+    },
+    [loadCalendarById]
+  );
+
+  const deleteCalendar = useCallback(
+    async (id: string) => {
+      try {
+        await calendarApi.remove(id);
+        if (activeCalendarId === id) {
+          setActiveCalendar(null);
+          setActiveCalendarId(null);
+          const url = new URL(window.location.href);
+          url.searchParams.delete('calendar');
+          window.history.replaceState({}, '', url.toString());
+        }
+        toast.success('Calendrier supprimé.');
+        return true;
+      } catch (err) {
+        toast.error(errorMessage(err, 'Suppression impossible.'));
+        return false;
+      }
+    },
+    [activeCalendarId, setActiveCalendarId]
+  );
+
+  const detachCalendar = useCallback(() => {
+    setActiveCalendar(null);
+    setActiveCalendarId(null);
+    const url = new URL(window.location.href);
+    url.searchParams.delete('calendar');
+    window.history.replaceState({}, '', url.toString());
+  }, [setActiveCalendarId]);
+
+  const cycleCategory = useCallback(
+    (course: ProcessedCourse) => {
+      const current = getEffectiveCategory(course);
+      const next = CATEGORY_ORDER[(CATEGORY_ORDER.indexOf(current) + 1) % CATEGORY_ORDER.length];
+      setCategoryOverrides(prev => ({ ...prev, [courseKey(course)]: next }));
+    },
+    [getEffectiveCategory, setCategoryOverrides]
+  );
+
+  const handleSetRating = useCallback(
+    (course: ProcessedCourse, rating: number) => {
+      const key = courseKey(course);
+      setRatings(prev => {
+        const next = { ...prev };
+        if (rating <= 0) delete next[key];
+        else next[key] = rating;
+        return next;
       });
+    },
+    [setRatings]
+  );
 
-      if (res.success && res.calendar) {
-        await loadCalendarById(res.calendar.id);
-        setShowCommunityModal(false);
-      }
-    } catch (err: any) {
-      setJsonError(`Erreur lors de la duplication : ${err.message}`);
-    }
-  };
+  const handleSetComment = useCallback(
+    (course: ProcessedCourse, comment: string) => {
+      const key = courseKey(course);
+      setComments(prev => {
+        const next = { ...prev };
+        if (!comment.trim()) delete next[key];
+        else next[key] = comment;
+        return next;
+      });
+    },
+    [setComments]
+  );
 
-  const ratedCoursesCount = useMemo(() => {
-    return coursesWithSchedules.filter(c => c.rating > 0 || (c.comment && c.comment.trim().length > 0)).length;
-  }, [coursesWithSchedules]);
+  const ratedCoursesCount = useMemo(
+    () => coursesWithSchedules.filter(course => course.rating > 0 || course.comment.trim().length > 0).length,
+    [coursesWithSchedules]
+  );
 
   const filteredCoursesList = useMemo(() => {
-    const filtered = coursesWithSchedules.filter(c => {
-      const term = searchTerm.toLowerCase();
+    const term = searchTerm.toLowerCase();
+
+    const filtered = coursesWithSchedules.filter(course => {
       const matchesSearch =
-        c.COUR_NM.toLowerCase().includes(term) ||
-        c.COUR_CD.toLowerCase().includes(term) ||
-        c.DEPARTMENT.toLowerCase().includes(term) ||
-        c.college.toLowerCase().includes(term) ||
-        c.PROF_NM.toLowerCase().includes(term) ||
-        (c.comment && c.comment.toLowerCase().includes(term));
+        course.COUR_NM.toLowerCase().includes(term) ||
+        course.COUR_CD.toLowerCase().includes(term) ||
+        course.DEPARTMENT.toLowerCase().includes(term) ||
+        course.college.toLowerCase().includes(term) ||
+        course.PROF_NM.toLowerCase().includes(term) ||
+        course.comment.toLowerCase().includes(term);
 
-      let matchesTab = false;
+      let matchesTab: boolean;
       if (activeTab === 'all') matchesTab = true;
-      else if (activeTab === 'rated') matchesTab = c.rating > 0 || (c.comment && c.comment.trim().length > 0);
-      else matchesTab = c.category === activeTab.toUpperCase();
+      else if (activeTab === 'rated') matchesTab = course.rating > 0 || course.comment.trim().length > 0;
+      else matchesTab = course.category === activeTab.toUpperCase();
 
-      const matchesExchange = showClosedExchange || c.openToExchange;
-      const matchesEnglish = !showOnlyEnglish || c.isEnglish;
+      const matchesExchange = showClosedExchange || course.openToExchange;
+      const matchesEnglish = !showOnlyEnglish || course.isEnglish;
 
       return matchesSearch && matchesTab && matchesExchange && matchesEnglish;
     });
 
     return [...filtered].sort((a, b) => {
-      if (sortBy === 'rating-desc') {
-        if (b.rating !== a.rating) return b.rating - a.rating;
-        return a.COUR_CD.localeCompare(b.COUR_CD);
-      }
-      if (sortBy === 'rating-asc') {
-        if (a.rating !== b.rating) return a.rating - b.rating;
-        return a.COUR_CD.localeCompare(b.COUR_CD);
-      }
+      if (sortBy === 'rating-desc') return b.rating - a.rating || a.COUR_CD.localeCompare(b.COUR_CD);
+      if (sortBy === 'rating-asc') return a.rating - b.rating || a.COUR_CD.localeCompare(b.COUR_CD);
       if (sortBy === 'level-asc') {
-        const lvlA = a.difficultyLevel ?? 999;
-        const lvlB = b.difficultyLevel ?? 999;
-        if (lvlA !== lvlB) return lvlA - lvlB;
-        return a.COUR_CD.localeCompare(b.COUR_CD);
+        return (a.difficultyLevel ?? 999) - (b.difficultyLevel ?? 999) || a.COUR_CD.localeCompare(b.COUR_CD);
       }
       if (sortBy === 'level-desc') {
-        const lvlA = a.difficultyLevel ?? -1;
-        const lvlB = b.difficultyLevel ?? -1;
-        if (lvlA !== lvlB) return lvlB - lvlA;
-        return a.COUR_CD.localeCompare(b.COUR_CD);
+        return (b.difficultyLevel ?? -1) - (a.difficultyLevel ?? -1) || a.COUR_CD.localeCompare(b.COUR_CD);
       }
       if (sortBy === 'code') return a.COUR_CD.localeCompare(b.COUR_CD);
       if (sortBy === 'name') return a.COUR_NM.localeCompare(b.COUR_NM);
@@ -357,64 +355,65 @@ export function useCoursesData() {
     });
   }, [coursesWithSchedules, searchTerm, activeTab, showClosedExchange, showOnlyEnglish, sortBy]);
 
-  const toggleCourse = (course: ProcessedCourse) => {
-    const isSelected = selectedCourses.some(sc => courseKey(sc) === courseKey(course));
-    if (isSelected) {
-      setSelectedCourses(selectedCourses.filter(sc => courseKey(sc) !== courseKey(course)));
-    } else {
-      setSelectedCourses([...selectedCourses, course]);
-    }
-  };
+  const toggleCourse = useCallback((course: ProcessedCourse) => {
+    setSelectedCourses(prev =>
+      prev.some(selected => courseKey(selected) === courseKey(course))
+        ? prev.filter(selected => courseKey(selected) !== courseKey(course))
+        : [...prev, course]
+    );
+  }, []);
 
-  const processJsonText = (rawText: string) => {
-    try {
-      let cleanText = rawText.trim();
-      if (cleanText.charCodeAt(0) === 0xfeff) cleanText = cleanText.slice(1);
+  const processJsonText = useCallback(
+    (rawText: string) => {
+      try {
+        let cleanText = rawText.trim();
+        if (cleanText.charCodeAt(0) === 0xfeff) cleanText = cleanText.slice(1);
 
-      const parsed = JSON.parse(cleanText);
+        const parsed = JSON.parse(cleanText);
 
-      // Session backup file check
-      if (parsed.type === 'ku_planner_backup' || parsed.ratings || parsed.comments || parsed.selectedCourseKeys) {
-        if (parsed.ratings && typeof parsed.ratings === 'object') setRatings(parsed.ratings);
-        if (parsed.comments && typeof parsed.comments === 'object') setComments(parsed.comments);
-        if (parsed.categoryOverrides && typeof parsed.categoryOverrides === 'object') setCategoryOverrides(parsed.categoryOverrides);
-        if (parsed.customCourses && Array.isArray(parsed.customCourses)) setCustomCourses(parsed.customCourses);
+        // Session backup rather than a raw catalog.
+        if (parsed.type === 'ku_planner_backup' || parsed.ratings || parsed.comments || parsed.selectedCourseKeys) {
+          if (parsed.ratings && typeof parsed.ratings === 'object') setRatings(parsed.ratings);
+          if (parsed.comments && typeof parsed.comments === 'object') setComments(parsed.comments);
+          if (parsed.categoryOverrides && typeof parsed.categoryOverrides === 'object') {
+            setCategoryOverrides(parsed.categoryOverrides);
+          }
+          if (Array.isArray(parsed.customCourses)) setCustomCourses(parsed.customCourses);
+          if (Array.isArray(parsed.selectedCourseKeys)) {
+            saveLocalStorage('ku_selected_keys', parsed.selectedCourseKeys);
+            const keySet = new Set<string>(parsed.selectedCourseKeys);
+            setSelectedCourses(coursesWithSchedules.filter(course => keySet.has(courseKey(course))));
+          }
 
-        const restoreKeys = parsed.selectedCourseKeys || [];
-        if (Array.isArray(restoreKeys) && restoreKeys.length > 0) {
-          const keySet = new Set(restoreKeys);
-          const allAvailable = [...(parsed.customCourses || []), ...courses];
-          const matched = allAvailable.filter(c => keySet.has(courseKey(c)));
-          // update will process via effect
+          const ratedNum = Object.keys(parsed.ratings || {}).length;
+          const commentsNum = Object.keys(parsed.comments || {}).length;
+          setJsonError(null);
+          setCatalogSource(`Session restaurée (${ratedNum} notes, ${commentsNum} commentaires)`);
+          toast.success('Session restaurée.');
+          return;
         }
 
-        const ratedNum = Object.keys(parsed.ratings || {}).length;
-        const commentsNum = Object.keys(parsed.comments || {}).length;
+        const normalized = processJsonPayload(cleanText);
+        setCourses([...customCourses, ...normalized]);
+        setCatalogSource(`catalogue importé (${normalized.length} cours)`);
         setJsonError(null);
-        setImportSuccess(true);
-        setCatalogSource(`Session restaurée (${ratedNum} notes, ${commentsNum} commentaires)`);
-        setTimeout(() => setImportSuccess(false), 5000);
-        return;
+        toast.success(`${normalized.length} cours importés.`);
+      } catch (err: any) {
+        setJsonError(`Erreur de lecture du JSON : ${err.message}`);
+        toast.error('JSON invalide.');
       }
+    },
+    [coursesWithSchedules, customCourses, setCategoryOverrides, setComments, setCustomCourses, setRatings]
+  );
 
-      // Otherwise raw catalog JSON
-      const normalized = processJsonPayload(cleanText);
-      const combined = [...customCourses, ...normalized];
-      setCourses(combined);
-      setCatalogSource(`fichier catalogue importé (${normalized.length} cours)`);
-      setJsonError(null);
-      setImportSuccess(true);
-      setTimeout(() => setImportSuccess(false), 5000);
-    } catch (err: any) {
-      setJsonError(`Erreur de lecture du JSON : ${err.message}`);
-      setImportSuccess(false);
-    }
-  };
-
-  const addCustomCourse = (newCourse: Course) => {
-    setCustomCourses(prev => [newCourse, ...prev]);
-    setCourses(prev => [newCourse, ...prev]);
-  };
+  const addCustomCourse = useCallback(
+    (newCourse: Course) => {
+      setCustomCourses(prev => [newCourse, ...prev]);
+      setCourses(prev => [newCourse, ...prev]);
+      toast.success(`« ${newCourse.COUR_NM} » ajouté au catalogue.`);
+    },
+    [setCustomCourses]
+  );
 
   return {
     courses,
@@ -427,16 +426,15 @@ export function useCoursesData() {
     ratings,
     comments,
     customCourses,
+    totalCredits,
     activeCalendar,
     activeCalendarId,
-    showCommunityModal,
-    setShowCommunityModal,
-    showCreateCalendarModal,
-    setShowCreateCalendarModal,
     loadCalendarById,
     saveActiveCalendar,
     createNewCalendar,
     duplicateCalendar,
+    deleteCalendar,
+    detachCalendar,
     searchTerm,
     setSearchTerm,
     showClosedExchange,
@@ -449,8 +447,6 @@ export function useCoursesData() {
     setSortBy,
     jsonError,
     setJsonError,
-    importSuccess,
-    setImportSuccess,
     loadingCatalog,
     catalogSource,
     setCatalogSource,

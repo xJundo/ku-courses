@@ -1,109 +1,168 @@
-import React from 'react';
-import { Calendar as CalendarIcon, MessageSquare, Star } from 'lucide-react';
-import { Category, ProcessedCourse, SelectedStats } from '../../types/course';
-import { CATEGORY_COLORS, DAYS_FR, DAYS_SHORT, PERIODS_MAP } from '../../constants/schedule';
-import { DifficultyScale } from '../common/DifficultyScale';
-import { courseKey } from '../../utils/courseUtils';
+import { CalendarIcon, MessageSquareIcon, MessagesSquareIcon, StarIcon } from 'lucide-react';
+import { DifficultyScale } from '@/components/common/DifficultyScale';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  CATEGORY_COLORS,
+  CATEGORY_LABELS,
+  CATEGORY_ORDER,
+  DAYS_FR,
+  DAYS_SHORT,
+  PERIODS_MAP
+} from '@/constants/schedule';
+import { cn } from '@/lib/utils';
+import type { CommentThreads, ProcessedCourse, SelectedStats } from '@/types/course';
+import { courseKey } from '@/utils/courseUtils';
 
 interface ScheduleTableProps {
   selectedCourses: ProcessedCourse[];
   selectedStats: SelectedStats;
+  threads: CommentThreads;
   onClearAll: () => void;
   onSelectCourseDetails: (course: ProcessedCourse) => void;
 }
 
-export const ScheduleTable: React.FC<ScheduleTableProps> = ({
+export function ScheduleTable({
   selectedCourses,
   selectedStats,
+  threads,
   onClearAll,
   onSelectCourseDetails
-}) => {
+}: ScheduleTableProps) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 shadow-xl flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-md font-bold text-white flex items-center gap-2">
-          <CalendarIcon className="h-4 w-4 text-violet-400" />
-          <span>Mon Emploi du Temps Hebdomadaire</span>
-        </h2>
+    <Card>
+      <CardHeader className="gap-3">
+        <CardTitle className="flex items-center gap-2">
+          <CalendarIcon className="size-4" />
+          Mon emploi du temps hebdomadaire
+        </CardTitle>
         {selectedCourses.length > 0 && (
-          <button onClick={onClearAll} className="text-xs text-zinc-500 hover:text-red-400 transition">
-            Tout vider
-          </button>
+          <CardAction>
+            <Button variant="ghost" size="xs" onClick={onClearAll}>
+              Tout vider
+            </Button>
+          </CardAction>
         )}
-      </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-left text-xs text-zinc-300">
-          <thead>
-            <tr className="border-b border-zinc-800 text-zinc-400 uppercase tracking-wider text-[10px]">
-              <th className="py-3 px-2 w-[10%] font-medium">Période</th>
-              {DAYS_SHORT.map(day => (
-                <th key={day} className={`py-3 px-2 w-[15%] text-center font-bold ${selectedStats.activeDays.has(day) ? 'text-violet-400 bg-violet-950/20' : ''}`}>
-                  {DAYS_FR[day]}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-800/40">
-            {Object.entries(PERIODS_MAP).map(([pIndex, info]) => (
-              <tr key={pIndex} className="hover:bg-zinc-800/10 transition">
-                <td className="py-3 px-2 font-mono text-[11px] text-zinc-500 font-medium">
-                  <div>P{pIndex}</div>
-                  <div className="text-[9px] text-zinc-600 font-normal">{info.start}</div>
-                </td>
-                {DAYS_SHORT.map(day => {
-                  const coursesAtThisSlot = selectedCourses.filter(c =>
-                    c.parsedSchedules.some((s: any) => s.day === day && s.periods.includes(Number(pIndex)))
-                  );
-                  const hasConflict = coursesAtThisSlot.length > 1;
+        {/* Legend: makes the per-category colours readable at a glance. */}
+        <div className="flex flex-wrap items-center gap-3">
+          {CATEGORY_ORDER.map(category => (
+            <span key={category} className="text-muted-foreground flex items-center gap-1.5 text-[11px]">
+              <span className={cn('size-2.5 rounded-full', CATEGORY_COLORS[category].accent)} aria-hidden />
+              {CATEGORY_LABELS[category]}
+            </span>
+          ))}
+        </div>
+      </CardHeader>
 
-                  return (
-                    <td key={day} className={`p-1.5 border-l border-zinc-800/30 relative min-h-[92px] align-top ${hasConflict ? 'bg-red-950/15' : ''}`}>
-                      {coursesAtThisSlot.map((course, cIdx) => (
-                        <div
-                          key={cIdx}
-                          title={`${course.COUR_NM} (${course.COUR_CD})\n${course.college}\n${course.DEPARTMENT}`}
-                          className={`rounded-xl p-2 border text-[10px] leading-tight flex flex-col justify-between h-full shadow cursor-pointer transition ${CATEGORY_COLORS[course.category as Category]?.grid || 'bg-zinc-800'} ${hasConflict ? 'ring-2 ring-red-500' : ''} ${!course.openToExchange ? 'ring-1 ring-red-600' : ''}`}
-                          onClick={() => onSelectCourseDetails(course)}
-                        >
-                          <div>
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold line-clamp-1">{course.COUR_CD}</span>
-                              {course.rating > 0 && (
-                                <span className="text-[9px] text-amber-300 font-bold flex items-center gap-0.5">
-                                  <Star className="h-2.5 w-2.5 fill-amber-400 text-amber-400" />
-                                  {course.rating}
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[9px] font-normal opacity-80 truncate">{course.COUR_NM}</div>
-                          </div>
-
-                          <div className="flex items-center gap-1 flex-wrap my-1">
-                            <span className={`text-[8px] px-1 rounded font-bold text-white ${course.openToExchange ? 'bg-emerald-600' : 'bg-red-600'}`}>
-                              {course.openToExchange ? 'OUVERT' : 'FERMÉ'}
-                            </span>
-                            <DifficultyScale level={course.difficultyLevel} compact />
-                            {course.seatsLimited && <span className="text-[8px] px-1 rounded font-bold text-white bg-amber-600">LIMITÉ</span>}
-                            {course.comment && <MessageSquare className="h-2.5 w-2.5 text-violet-300" />}
-                          </div>
-
-                          <div className="flex items-center justify-between text-[8px] opacity-70">
-                            <span className="truncate">{course.PROF_NM || 'N/A'}</span>
-                            <span className="font-mono bg-black/25 px-1 rounded">
-                              {course.parsedSchedules.find((s: any) => s.day === day)?.room || 'N/A'}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </td>
-                  );
-                })}
+      <CardContent>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[720px] border-collapse text-left text-xs">
+            <thead>
+              <tr className="text-muted-foreground border-b text-[10px] uppercase">
+                <th className="w-[10%] px-2 py-3 font-medium">Période</th>
+                {DAYS_SHORT.map(day => (
+                  <th
+                    key={day}
+                    className={cn(
+                      'w-[15%] px-2 py-3 text-center font-semibold',
+                      selectedStats.activeDays.has(day) && 'text-foreground bg-muted/50'
+                    )}
+                  >
+                    {DAYS_FR[day]}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+            </thead>
+            <tbody>
+              {Object.entries(PERIODS_MAP).map(([periodIndex, info]) => (
+                <tr key={periodIndex} className="border-b last:border-0">
+                  <td className="text-muted-foreground px-2 py-3 font-mono text-[11px]">
+                    <div className="font-semibold">P{periodIndex}</div>
+                    <div className="text-[9px]">{info.start}</div>
+                  </td>
+                  {DAYS_SHORT.map(day => {
+                    const coursesAtSlot = selectedCourses.filter(course =>
+                      course.parsedSchedules.some(
+                        schedule =>
+                          schedule.day === day && schedule.periods.includes(Number(periodIndex))
+                      )
+                    );
+                    const hasConflict = coursesAtSlot.length > 1;
+
+                    return (
+                      <td
+                        key={day}
+                        className={cn(
+                          'border-l p-1.5 align-top',
+                          hasConflict && 'bg-destructive/10'
+                        )}
+                      >
+                        {coursesAtSlot.map(course => {
+                          const key = courseKey(course);
+                          const colors = CATEGORY_COLORS[course.category] ?? CATEGORY_COLORS.OTHERS;
+                          const discussionCount = threads[key]?.length ?? 0;
+
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              title={`${course.COUR_NM} (${course.COUR_CD})\n${course.college}`}
+                              onClick={() => onSelectCourseDetails(course)}
+                              className={cn(
+                                'flex w-full flex-col gap-1 rounded-lg border p-2 text-left text-[10px] leading-tight transition',
+                                colors.grid,
+                                hasConflict && 'ring-destructive ring-2',
+                                !course.openToExchange && 'ring-destructive/60 ring-1'
+                              )}
+                            >
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="truncate font-semibold">{course.COUR_CD}</span>
+                                {course.rating > 0 && (
+                                  <span className="flex shrink-0 items-center gap-0.5 text-[9px] font-semibold">
+                                    <StarIcon className="fill-warning text-warning size-2.5" />
+                                    {course.rating}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="truncate text-[9px] opacity-80">{course.COUR_NM}</span>
+
+                              <div className="flex flex-wrap items-center gap-1">
+                                <DifficultyScale level={course.difficultyLevel} compact />
+                                {course.seatsLimited && (
+                                  <Badge variant="outline" className="px-1 py-0 text-[8px]">
+                                    Limité
+                                  </Badge>
+                                )}
+                                {course.comment && <MessageSquareIcon className="size-2.5" />}
+                                {discussionCount > 0 && (
+                                  <span className="flex items-center gap-0.5 text-[8px]">
+                                    <MessagesSquareIcon className="size-2.5" />
+                                    {discussionCount}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center justify-between text-[8px] opacity-70">
+                                <span className="truncate">{course.PROF_NM || 'N/A'}</span>
+                                <span className="font-mono">
+                                  {course.parsedSchedules.find(schedule => schedule.day === day)?.room ||
+                                    'N/A'}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   );
-};
+}

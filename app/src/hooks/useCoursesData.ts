@@ -35,6 +35,14 @@ export function useCoursesData() {
   const [comments, setComments] = useLocalStorageState<Record<string, string>>('ku_comments', {});
   const [customCourses, setCustomCourses] = useLocalStorageState<Course[]>('ku_custom_courses', []);
 
+  // Course keys waiting to be matched against the catalog. The catalog is
+  // fetched asynchronously, so a selection restored before it lands must not be
+  // resolved against the (3-course) fallback list.
+  const [pendingSelectionKeys, setPendingSelectionKeys] = useState<string[] | null>(null);
+  // Captured at mount: the persistence effect below rewrites this key with an
+  // empty array on the very first commit, so it has to be read before that.
+  const [savedSelectionKeys] = useState(() => loadLocalStorage<string[]>('ku_selected_keys', []));
+
   const [activeCalendar, setActiveCalendar] = useState<CommunityCalendar | null>(null);
   const [activeCalendarId, setActiveCalendarId] = useLocalStorageState<string | null>('ku_active_calendar_id', null);
 
@@ -104,17 +112,14 @@ export function useCoursesData() {
     [coursesBase, ratings, comments]
   );
 
-  // Restore the previous selection once the catalog is available.
+  // Turn pending keys into actual courses once the catalog — and any custom
+  // courses that came with a calendar — are in state.
   useEffect(() => {
-    if (selectedCourses.length > 0 || coursesWithSchedules.length === 0) return;
-    const savedKeys = loadLocalStorage<string[]>('ku_selected_keys', []);
-    if (savedKeys.length === 0) return;
-
-    const keySet = new Set(savedKeys);
-    const restored = coursesWithSchedules.filter(course => keySet.has(courseKey(course)));
-    if (restored.length > 0) setSelectedCourses(restored);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the catalog lands
-  }, [coursesWithSchedules]);
+    if (!pendingSelectionKeys || loadingCatalog) return;
+    const keySet = new Set(pendingSelectionKeys);
+    setSelectedCourses(coursesWithSchedules.filter(course => keySet.has(courseKey(course))));
+    setPendingSelectionKeys(null);
+  }, [pendingSelectionKeys, loadingCatalog, coursesWithSchedules]);
 
   const loadCalendarById = useCallback(
     async (id: string, options: { silent?: boolean } = {}) => {
@@ -135,8 +140,9 @@ export function useCoursesData() {
           });
         }
 
-        const keySet = new Set(calendar.selectedCourseKeys || []);
-        setSelectedCourses(coursesWithSchedules.filter(course => keySet.has(courseKey(course))));
+        // Deferred on purpose: filtering here would race the catalog fetch and
+        // the custom courses merged in just above.
+        setPendingSelectionKeys(calendar.selectedCourseKeys || []);
 
         const url = new URL(window.location.href);
         url.searchParams.set('calendar', calendar.id);
@@ -154,19 +160,24 @@ export function useCoursesData() {
         return null;
       }
     },
-    [coursesWithSchedules, setActiveCalendarId, setCategoryOverrides, setComments, setCustomCourses, setRatings]
+    [setActiveCalendarId, setCategoryOverrides, setComments, setCustomCourses, setRatings]
   );
 
-  // Resolve a calendar from the URL (?calendar=) or the last one used.
+  // Restore the previous selection, then the calendar from the URL (?calendar=)
+  // or the last one used. Waits for the catalog so the keys match against the
+  // real course list rather than the fallback one.
   const [bootstrapped, setBootstrapped] = useState(false);
   useEffect(() => {
-    if (bootstrapped || coursesWithSchedules.length === 0) return;
+    if (bootstrapped || loadingCatalog) return;
     setBootstrapped(true);
+
+    if (savedSelectionKeys.length > 0) setPendingSelectionKeys(savedSelectionKeys);
 
     const params = new URLSearchParams(window.location.search);
     const targetId = params.get('calendar') || params.get('c') || activeCalendarId;
+    // Resolves later than the line above, so the calendar wins when there is one.
     if (targetId) void loadCalendarById(targetId, { silent: true });
-  }, [bootstrapped, coursesWithSchedules.length, activeCalendarId, loadCalendarById]);
+  }, [bootstrapped, loadingCatalog, activeCalendarId, loadCalendarById, savedSelectionKeys]);
 
   const totalCredits = useMemo(
     () => selectedCourses.reduce((acc, course) => acc + course.creditsNum, 0),

@@ -9,6 +9,7 @@ import {
   verifyPassword
 } from '../auth.js';
 import { query } from '../db.js';
+import { allocateHandle } from '../handles.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD_LENGTH = 8;
@@ -39,12 +40,13 @@ router.post('/register', credentialsLimiter, async (req, res, next) => {
     }
 
     const passwordHash = await hashPassword(password);
+    const handle = await allocateHandle(query, { displayName, email });
     const { rows } = await query(
-      `INSERT INTO users (email, password_hash, display_name)
-       VALUES ($1, $2, $3)
+      `INSERT INTO users (email, password_hash, display_name, handle)
+       VALUES ($1, $2, $3, $4)
        ON CONFLICT (email) DO NOTHING
-       RETURNING id, email, display_name`,
-      [email, passwordHash, displayName]
+       RETURNING id, email, display_name, handle`,
+      [email, passwordHash, displayName, handle]
     );
 
     if (!rows[0]) {
@@ -65,7 +67,7 @@ router.post('/login', credentialsLimiter, async (req, res, next) => {
     const password = String(req.body?.password || '');
 
     const { rows } = await query(
-      'SELECT id, email, display_name, password_hash FROM users WHERE email = $1',
+      'SELECT id, email, display_name, handle, password_hash FROM users WHERE email = $1',
       [email]
     );
     const row = rows[0];
@@ -102,7 +104,7 @@ router.patch('/me', requireAuth, async (req, res, next) => {
     }
 
     const { rows } = await query(
-      'UPDATE users SET display_name = $1 WHERE id = $2 RETURNING id, email, display_name',
+      'UPDATE users SET display_name = $1 WHERE id = $2 RETURNING id, email, display_name, handle',
       [displayName, req.user.id]
     );
     // Keep the denormalised author name on existing calendars in sync.

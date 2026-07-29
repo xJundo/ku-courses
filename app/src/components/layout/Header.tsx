@@ -1,7 +1,8 @@
-import { CalendarDaysIcon, GlobeIcon, SaveIcon, SlidersIcon } from 'lucide-react';
+import { CalendarDaysIcon, GlobeIcon, SaveIcon, SlidersIcon, UsersIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { navigate, routes } from '@/hooks/useRouter';
 import { ThemeToggle } from './ThemeToggle';
 import { UserMenu } from './UserMenu';
 import type { CommunityCalendar } from '@/types/course';
@@ -23,13 +24,20 @@ export function Header({
     <header className="bg-background/80 sticky top-0 z-40 border-b backdrop-blur-md">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-6">
         <div className="flex items-center gap-3">
-          <div className="bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-lg">
+          <button
+            type="button"
+            aria-label="Retour au planificateur"
+            className="bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-lg"
+            onClick={() => navigate(routes.planner)}
+          >
             <CalendarDaysIcon className="size-5" />
-          </div>
+          </button>
           <div className="flex flex-col gap-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-heading text-base font-semibold tracking-tight">
-                KU Sejong Planificateur
+                <button type="button" onClick={() => navigate(routes.planner)}>
+                  KU Sejong Planificateur
+                </button>
               </h1>
               {activeCalendar && (
                 <Badge variant="secondary" asChild>
@@ -47,6 +55,11 @@ export function Header({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate(routes.profiles)}>
+            <UsersIcon data-icon="inline-start" />
+            Profils
+          </Button>
+
           <Button variant="outline" size="sm" onClick={onOpenCommunity}>
             <GlobeIcon data-icon="inline-start" />
             Communauté

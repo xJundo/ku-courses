@@ -6,11 +6,13 @@ import {
   CopyIcon,
   DownloadIcon,
   GlobeIcon,
+  LockIcon,
   MessagesSquareIcon,
   PencilIcon,
   PlusIcon,
   RefreshCwIcon,
   SaveIcon,
+  SettingsIcon,
   Share2Icon,
   Trash2Icon,
   UserIcon
@@ -40,6 +42,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/in
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/AuthContext';
+import { navigate, routes } from '@/hooks/useRouter';
 import { ApiError, calendarApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import type { CalendarSummary, CommunityCalendar } from '@/types/course';
@@ -48,6 +51,8 @@ import { EditCalendarDialog } from './EditCalendarDialog';
 interface CommunityCalendarsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Changing this value refetches the list (e.g. after an access change). */
+  refreshToken?: number;
   activeCalendarId: string | null;
   canSaveActive: boolean;
   onSelectCalendar: (id: string) => void;
@@ -55,6 +60,7 @@ interface CommunityCalendarsDialogProps {
   onSaveActive: () => void;
   onDuplicate: (calendar: CommunityCalendar) => Promise<unknown>;
   onUpdateMeta: (id: string, name: string, description: string) => Promise<unknown>;
+  onManageAccess: (calendar: CalendarSummary) => void;
   onDelete: (id: string) => Promise<boolean>;
   onRequireAuth: () => void;
 }
@@ -71,6 +77,7 @@ function formatDate(iso: string) {
 export function CommunityCalendarsDialog({
   open,
   onOpenChange,
+  refreshToken,
   activeCalendarId,
   canSaveActive,
   onSelectCalendar,
@@ -78,6 +85,7 @@ export function CommunityCalendarsDialog({
   onSaveActive,
   onDuplicate,
   onUpdateMeta,
+  onManageAccess,
   onDelete,
   onRequireAuth
 }: CommunityCalendarsDialogProps) {
@@ -103,7 +111,7 @@ export function CommunityCalendarsDialog({
 
   useEffect(() => {
     if (open) void fetchList();
-  }, [open, fetchList]);
+  }, [open, refreshToken, fetchList]);
 
   const handleShare = async (id: string) => {
     const url = new URL(window.location.href);
@@ -164,7 +172,7 @@ export function CommunityCalendarsDialog({
               Calendriers communautaires
             </DialogTitle>
             <DialogDescription>
-              Tous les plannings publiés par les étudiants. Chargez-en un pour le consulter et
+              Tous les plannings auxquels vous avez accès. Chargez-en un pour le consulter et
               discuter de ses cours.
             </DialogDescription>
           </DialogHeader>
@@ -269,6 +277,12 @@ export function CommunityCalendarsDialog({
                             </Badge>
                           )}
                           {calendar.isOwner && <Badge variant="outline">Mon calendrier</Badge>}
+                          {calendar.visibility === 'restricted' && (
+                            <Badge variant="secondary" className="gap-1">
+                              <LockIcon />
+                              {calendar.sharedCount} profil(s)
+                            </Badge>
+                          )}
                         </div>
 
                         {calendar.description && (
@@ -278,10 +292,24 @@ export function CommunityCalendarsDialog({
                         )}
 
                         <div className="text-muted-foreground flex flex-wrap items-center gap-3 pt-1 text-xs">
-                          <span className="flex items-center gap-1">
-                            <UserIcon className="size-3.5" />
-                            {calendar.author}
-                          </span>
+                          {calendar.ownerHandle ? (
+                            <button
+                              type="button"
+                              className="hover:text-foreground flex items-center gap-1 underline-offset-2 hover:underline"
+                              onClick={() => {
+                                onOpenChange(false);
+                                navigate(routes.profile(calendar.ownerHandle!));
+                              }}
+                            >
+                              <UserIcon className="size-3.5" />
+                              {calendar.author}
+                            </button>
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              <UserIcon className="size-3.5" />
+                              {calendar.author}
+                            </span>
+                          )}
                           <span className="flex items-center gap-1">
                             <CalendarIcon className="size-3.5" />
                             {calendar.courseCount} cours ({calendar.totalCredits} cr.)
@@ -327,6 +355,15 @@ export function CommunityCalendarsDialog({
 
                         {calendar.isOwner && (
                           <>
+                            <Button
+                              variant="outline"
+                              size="icon-sm"
+                              aria-label="Gérer les accès à ce calendrier"
+                              onClick={() => onManageAccess(calendar)}
+                            >
+                              <SettingsIcon />
+                            </Button>
+
                             <Button
                               variant="outline"
                               size="icon-sm"

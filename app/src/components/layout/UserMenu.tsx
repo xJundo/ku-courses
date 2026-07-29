@@ -1,4 +1,4 @@
-import { LogInIcon, LogOutIcon } from 'lucide-react';
+import { LogInIcon, LogOutIcon, UserRoundIcon, UsersIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/context/AuthContext';
+import { navigate, routes } from '@/hooks/useRouter';
 
 interface UserMenuProps {
   onOpenAuth: () => void;
@@ -47,9 +48,22 @@ export function UserMenu({ onOpenAuth }: UserMenuProps) {
         <DropdownMenuLabel>
           <div className="flex flex-col gap-0.5">
             <span className="text-sm font-semibold">{user.displayName}</span>
-            <span className="text-muted-foreground truncate text-xs font-normal">{user.email}</span>
+            <span className="text-muted-foreground truncate text-xs font-normal">
+              @{user.handle}
+            </span>
           </div>
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
+          <DropdownMenuItem onClick={() => navigate(routes.profile(user.handle))}>
+            <UserRoundIcon />
+            Mon profil
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate(routes.profiles)}>
+            <UsersIcon />
+            Tous les profils
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem

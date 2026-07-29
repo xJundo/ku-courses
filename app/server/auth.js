@@ -37,7 +37,7 @@ export function clearSession(res) {
 
 export function publicUser(row) {
   if (!row) return null;
-  return { id: row.id, email: row.email, displayName: row.display_name };
+  return { id: row.id, email: row.email, displayName: row.display_name, handle: row.handle };
 }
 
 /**
@@ -52,7 +52,7 @@ export async function attachUser(req, _res, next) {
   try {
     const payload = jwt.verify(token, config.jwtSecret);
     const { rows } = await query(
-      'SELECT id, email, display_name FROM users WHERE id = $1',
+      'SELECT id, email, display_name, handle FROM users WHERE id = $1',
       [payload.sub]
     );
     if (rows[0]) req.user = publicUser(rows[0]);

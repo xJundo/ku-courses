@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { CATEGORY_ORDER, FALLBACK_COURSES } from '@/constants/schedule';
 import { ApiError, calendarApi } from '@/lib/api';
 import type {
+  CalendarVisibility,
   Category,
   CommunityCalendar,
   Course,
@@ -21,6 +22,7 @@ import {
 import { parseSchedule } from '@/utils/scheduleUtils';
 import { loadLocalStorage, saveLocalStorage } from '@/utils/storage';
 import { useLocalStorageState } from './useLocalStorage';
+import { useMyRatings } from './useMyRatings';
 
 function errorMessage(err: unknown, fallback: string) {
   return err instanceof ApiError ? err.message : fallback;
@@ -30,10 +32,11 @@ export function useCoursesData() {
   const [courses, setCourses] = useState<Course[]>(FALLBACK_COURSES);
   const [selectedCourses, setSelectedCourses] = useState<ProcessedCourse[]>([]);
   const [categoryOverrides, setCategoryOverrides] = useLocalStorageState<Record<string, Category>>('ku_cat_overrides', {});
-  const [ratings, setRatings] = useLocalStorageState<Record<string, number>>('ku_ratings', {});
-  // Private per-course notes of the current session (published as `notes`).
-  const [comments, setComments] = useLocalStorageState<Record<string, string>>('ku_comments', {});
   const [customCourses, setCustomCourses] = useLocalStorageState<Course[]>('ku_custom_courses', []);
+
+  // Ratings and private notes follow the signed-in profile, not the calendar
+  // currently open — opening someone else's planning no longer touches them.
+  const { ratings, notes: comments, setRating, setNote } = useMyRatings();
 
   // Course keys waiting to be matched against the catalog. The catalog is
   // fetched asynchronously, so a selection restored before it lands must not be
@@ -131,8 +134,6 @@ export function useCoursesData() {
         setActiveCalendar(calendar);
         setActiveCalendarId(calendar.id);
         setCategoryOverrides(calendar.categoryOverrides || {});
-        setRatings(calendar.ratings || {});
-        setComments(calendar.notes || {});
         if (Array.isArray(calendar.customCourses) && calendar.customCourses.length > 0) {
           setCustomCourses(calendar.customCourses);
           setCourses(prev => {
@@ -162,7 +163,7 @@ export function useCoursesData() {
         return null;
       }
     },
-    [setActiveCalendarId, setCategoryOverrides, setComments, setCustomCourses, setRatings]
+    [setActiveCalendarId, setCategoryOverrides, setCustomCourses]
   );
 
   // Restore the previous selection, then the calendar from the URL (?calendar=)
@@ -192,8 +193,6 @@ export function useCoursesData() {
       const { calendar } = await calendarApi.update(activeCalendar.id, {
         selectedCourseKeys: selectedCourses.map(courseKey),
         categoryOverrides,
-        ratings,
-        notes: comments,
         customCourses,
         totalCredits
       });
@@ -202,18 +201,22 @@ export function useCoursesData() {
     } catch (err) {
       toast.error(errorMessage(err, "Erreur lors de l'enregistrement."));
     }
-  }, [activeCalendar, categoryOverrides, comments, customCourses, ratings, selectedCourses, totalCredits]);
+  }, [activeCalendar, categoryOverrides, customCourses, selectedCourses, totalCredits]);
 
   const createNewCalendar = useCallback(
-    async (name: string, description: string, copyCurrent: boolean) => {
+    async (
+      name: string,
+      description: string,
+      copyCurrent: boolean,
+      visibility: CalendarVisibility = 'public'
+    ) => {
       try {
         const { calendar } = await calendarApi.create({
           name,
           description,
+          visibility,
           selectedCourseKeys: copyCurrent ? selectedCourses.map(courseKey) : [],
           categoryOverrides: copyCurrent ? categoryOverrides : {},
-          ratings: copyCurrent ? ratings : {},
-          notes: copyCurrent ? comments : {},
           customCourses: copyCurrent ? customCourses : [],
           totalCredits: copyCurrent ? totalCredits : 0
         });
@@ -233,7 +236,7 @@ export function useCoursesData() {
         return null;
       }
     },
-    [categoryOverrides, comments, customCourses, ratings, selectedCourses, setActiveCalendarId, totalCredits]
+    [categoryOverrides, customCourses, selectedCourses, setActiveCalendarId, totalCredits]
   );
 
   /** Renames a calendar / updates its note, without touching its course selection. */
@@ -252,7 +255,40 @@ export function useCoursesData() {
     [activeCalendar]
   );
 
-  /** Copies someone else's calendar into a new one owned by the current user. */
+  /** Opens a calendar to everybody, or to an explicit list of profiles. */
+  const updateCalendarAccess = useCallback(
+    async (id: string, visibility: CalendarVisibility, sharedWith: string[]) => {
+      try {
+        const result = await calendarApi.setShares(id, visibility, sharedWith);
+        setActiveCalendar(prev =>
+          prev?.id === id
+            ? {
+                ...prev,
+                visibility: result.visibility,
+                sharedWith: result.sharedWith,
+                sharedCount: result.sharedWith.length
+              }
+            : prev
+        );
+        toast.success(
+          result.visibility === 'public'
+            ? 'Calendrier visible par tout le monde.'
+            : `Accès limité à ${result.sharedWith.length} profil(s).`
+        );
+        return result;
+      } catch (err) {
+        toast.error(errorMessage(err, 'Modification des accès impossible.'));
+        return null;
+      }
+    },
+    []
+  );
+
+  /**
+   * Copies someone else's calendar into a new one owned by the current user.
+   * Only the course selection travels: the copy shows the new owner's own
+   * ratings, never the ones of the person it was copied from.
+   */
   const duplicateCalendar = useCallback(
     async (source: CommunityCalendar) => {
       try {
@@ -261,8 +297,6 @@ export function useCoursesData() {
           description: source.description || '',
           selectedCourseKeys: source.selectedCourseKeys || [],
           categoryOverrides: source.categoryOverrides || {},
-          ratings: source.ratings || {},
-          notes: source.notes || {},
           customCourses: source.customCourses || [],
           totalCredits: source.totalCredits || 0
         });
@@ -316,29 +350,13 @@ export function useCoursesData() {
   );
 
   const handleSetRating = useCallback(
-    (course: ProcessedCourse, rating: number) => {
-      const key = courseKey(course);
-      setRatings(prev => {
-        const next = { ...prev };
-        if (rating <= 0) delete next[key];
-        else next[key] = rating;
-        return next;
-      });
-    },
-    [setRatings]
+    (course: ProcessedCourse, rating: number) => setRating(courseKey(course), rating),
+    [setRating]
   );
 
   const handleSetComment = useCallback(
-    (course: ProcessedCourse, comment: string) => {
-      const key = courseKey(course);
-      setComments(prev => {
-        const next = { ...prev };
-        if (!comment.trim()) delete next[key];
-        else next[key] = comment;
-        return next;
-      });
-    },
-    [setComments]
+    (course: ProcessedCourse, comment: string) => setNote(courseKey(course), comment),
+    [setNote]
   );
 
   const ratedCoursesCount = useMemo(
@@ -458,8 +476,17 @@ export function useCoursesData() {
 
         // Session backup rather than a raw catalog.
         if (parsed.type === 'ku_planner_backup' || parsed.ratings || parsed.comments || parsed.selectedCourseKeys) {
-          if (parsed.ratings && typeof parsed.ratings === 'object') setRatings(parsed.ratings);
-          if (parsed.comments && typeof parsed.comments === 'object') setComments(parsed.comments);
+          // Restored entry by entry so each one lands on the current profile.
+          if (parsed.ratings && typeof parsed.ratings === 'object') {
+            for (const [key, value] of Object.entries(parsed.ratings)) {
+              setRating(key, Number(value) || 0);
+            }
+          }
+          if (parsed.comments && typeof parsed.comments === 'object') {
+            for (const [key, value] of Object.entries(parsed.comments)) {
+              setNote(key, String(value ?? ''));
+            }
+          }
           if (parsed.categoryOverrides && typeof parsed.categoryOverrides === 'object') {
             setCategoryOverrides(parsed.categoryOverrides);
           }
@@ -488,7 +515,7 @@ export function useCoursesData() {
         toast.error('JSON invalide.');
       }
     },
-    [coursesWithSchedules, customCourses, setCategoryOverrides, setComments, setCustomCourses, setRatings]
+    [coursesWithSchedules, customCourses, setCategoryOverrides, setCustomCourses, setNote, setRating]
   );
 
   const addCustomCourse = useCallback(
@@ -518,6 +545,7 @@ export function useCoursesData() {
     saveActiveCalendar,
     createNewCalendar,
     updateCalendarMeta,
+    updateCalendarAccess,
     duplicateCalendar,
     deleteCalendar,
     detachCalendar,

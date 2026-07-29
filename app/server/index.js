@@ -9,6 +9,8 @@ import { config } from './config.js';
 import { migrate, pool, waitForDatabase } from './db.js';
 import authRoutes from './routes/auth.js';
 import calendarRoutes from './routes/calendars.js';
+import ratingRoutes from './routes/ratings.js';
+import userRoutes from './routes/users.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DIST_DIR = path.join(__dirname, '..', 'dist');
@@ -37,6 +39,8 @@ app.get('/api/health', async (_req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/calendars', calendarRoutes);
+app.use('/api/ratings', ratingRoutes);
+app.use('/api/users', userRoutes);
 
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Route API inconnue.' });

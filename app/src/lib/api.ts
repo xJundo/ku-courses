@@ -1,11 +1,15 @@
 import type {
   AuthUser,
   CalendarSummary,
+  CalendarVisibility,
   Category,
   CommentThreads,
   CommunityCalendar,
   Course,
-  CourseComment
+  CourseComment,
+  Profile,
+  ProfileRating,
+  SharedUser
 } from '@/types/course';
 
 /** Thrown for any non-2xx API response, carrying the server's French message. */
@@ -43,12 +47,19 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export interface CalendarPayload {
   name?: string;
   description?: string;
+  visibility?: CalendarVisibility;
+  /** Profile ids allowed to open a `restricted` calendar. */
+  sharedWith?: string[];
   selectedCourseKeys?: string[];
   categoryOverrides?: Record<string, Category>;
-  ratings?: Record<string, number>;
-  notes?: Record<string, string>;
   customCourses?: Course[];
   totalCredits?: number;
+}
+
+/** The signed-in user's own ratings and private notes, keyed by course. */
+export interface MyRatings {
+  ratings: Record<string, number>;
+  notes: Record<string, string>;
 }
 
 export const authApi = {
@@ -76,7 +87,11 @@ export const authApi = {
 };
 
 export const calendarApi = {
-  list: () => request<{ calendars: CalendarSummary[] }>('/calendars'),
+  /** Everything the viewer may see, optionally narrowed to one owner. */
+  list: (ownerId?: string) =>
+    request<{ calendars: CalendarSummary[] }>(
+      ownerId ? `/calendars?owner=${encodeURIComponent(ownerId)}` : '/calendars'
+    ),
 
   get: (id: string) => request<{ calendar: CommunityCalendar }>(`/calendars/${id}`),
 
@@ -103,5 +118,44 @@ export const calendarApi = {
     }),
 
   removeComment: (id: string, commentId: string) =>
-    request<{ ok: true }>(`/calendars/${id}/comments/${commentId}`, { method: 'DELETE' })
+    request<{ ok: true }>(`/calendars/${id}/comments/${commentId}`, { method: 'DELETE' }),
+
+  getShares: (id: string) =>
+    request<{ visibility: CalendarVisibility; sharedWith: SharedUser[] }>(
+      `/calendars/${id}/shares`
+    ),
+
+  setShares: (id: string, visibility: CalendarVisibility, sharedWith: string[]) =>
+    request<{ visibility: CalendarVisibility; sharedWith: SharedUser[] }>(
+      `/calendars/${id}/shares`,
+      { method: 'PUT', body: JSON.stringify({ visibility, sharedWith }) }
+    )
+};
+
+export const userApi = {
+  /** `query` may be typed with or without a leading `@`. */
+  list: (query = '') =>
+    request<{ users: Profile[] }>(`/users?q=${encodeURIComponent(query.replace(/^@+/, ''))}`),
+
+  get: (idOrHandle: string) =>
+    request<{ profile: Profile }>(`/users/${encodeURIComponent(idOrHandle.replace(/^@+/, ''))}`),
+
+  ratings: (id: string) => request<{ ratings: ProfileRating[] }>(`/users/${id}/ratings`)
+};
+
+export const ratingApi = {
+  mine: () => request<MyRatings>('/ratings/me'),
+
+  set: (courseKey: string, rating: number, note: string) =>
+    request<{ courseKey: string; rating: number; note: string }>(
+      `/ratings/me/${encodeURIComponent(courseKey)}`,
+      { method: 'PUT', body: JSON.stringify({ rating, note }) }
+    ),
+
+  /** Merges ratings kept in localStorage into the account; server rows win. */
+  importLocal: (payload: MyRatings) =>
+    request<MyRatings & { imported: number }>('/ratings/me/import', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    })
 };

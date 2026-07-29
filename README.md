@@ -39,13 +39,22 @@ calendars and per-course discussion threads.
 
 ## 🚀 Features
 
-### 👤 Accounts & community calendars
+### 👤 Accounts & profiles
 - **Email + password sign-up**, sessions carried by an httpOnly JWT cookie (bcrypt hashing, rate
   limiting on credential endpoints).
-- Any calendar you create is **published immediately** to the community list.
-- **Only its owner can edit or delete it.** Everybody else can open it, share its link, or duplicate
-  it into a calendar of their own.
-- Every calendar has a **direct share link** (`?calendar=<uuid>`).
+- Every account gets a public **`@handle`**, derived from its display name and unique across the app.
+- **`/profils`** lists every account (calendars published, courses rated, sign-up date) with a search
+  box that accepts a name or an `@handle`.
+- **`/profils/@handle`** shows one profile: the calendars you are allowed to see, and every course
+  they rated. E-mail addresses are never part of a profile payload.
+
+### 🔒 Community calendars & access control
+- Each calendar is either **public** (listed for everyone, openable by link) or **restricted** to an
+  explicit, editable list of profiles — picked from a searchable table of checkboxes.
+- **Only its owner can edit, delete or re-share it.** Everybody with access can open it, share its
+  link, or duplicate it into a calendar of their own.
+- Every calendar has a **direct share link** (`?calendar=<uuid>`), which still honours its access
+  list.
 
 ### 💬 Per-course discussions
 - Each course inside a calendar carries its own **discussion thread** — a mini chat between the
@@ -68,7 +77,10 @@ calendars and per-course discussion threads.
 ### 🔍 Catalog & filtering
 - Instant search by name, code, professor, department or personal note.
 - Category tabs, exchange-only and English-only toggles, and sorting by rating, level, code or name.
-- 1-to-5-star ratings and private per-course notes.
+- 1-to-5-star ratings and private per-course notes, **owned by your profile** rather than by the
+  calendar you happen to have open. Opening someone else's calendar never touches your own ratings.
+  Ratings made while signed out live in `localStorage` and are imported into the first account that
+  signs in on that browser. Stars are public on your profile page; the free-text notes stay private.
 
 ### ➕ Custom courses & category overrides
 - Add personal commitments or external lectures with custom time slots.
@@ -110,15 +122,18 @@ ku-courses/
 │   ├── server/                     # Express API
 │   │   ├── index.js                # bootstrap, static SPA, error handling
 │   │   ├── config.js               # env parsing & production guards
-│   │   ├── db.js                   # pg pool, schema, legacy import
+│   │   ├── db.js                   # pg pool, schema, migrations, legacy import
 │   │   ├── auth.js                 # bcrypt, JWT cookie, rate limiting
-│   │   └── routes/{auth,calendars}.js
+│   │   ├── access.js               # calendar visibility predicate
+│   │   ├── handles.js              # @handle generation
+│   │   └── routes/{auth,calendars,ratings,users}.js
 │   ├── public/courses.json         # default Fall 2026 dataset
 │   └── src/                        # React 18 + TypeScript SPA
 │       ├── components/ui/          # shadcn/ui primitives
 │       ├── components/{auth,catalog,common,dialogs,discussion,layout,schedule}/
 │       ├── context/AuthContext.tsx
-│       ├── hooks/                  # useCoursesData, useCalendarDiscussions, …
+│       ├── hooks/                  # useCoursesData, useMyRatings, useRouter, …
+│       ├── pages/                   # ProfilesPage, ProfilePage
 │       ├── lib/api.ts              # typed API client
 │       └── index.css               # theme tokens + per-category colours
 └── *.json                          # raw KU Sejong datasets
@@ -204,11 +219,26 @@ To add a shadcn component: `npx shadcn@latest add <component>`.
 
 | Table | Purpose |
 | --- | --- |
-| `users` | `id`, `email` (unique), `password_hash` (bcrypt), `display_name`, `created_at`. |
-| `calendars` | Owned by a user (`owner_id`, nullable for legacy imports). Holds `selected_course_keys`, `category_overrides`, `ratings`, `notes` and `custom_courses` as `jsonb`, plus `total_credits`. |
+| `users` | `id`, `email` (unique), `password_hash` (bcrypt), `display_name`, `handle` (unique, case-insensitive), `created_at`. |
+| `calendars` | Owned by a user (`owner_id`, nullable for legacy imports). Holds `selected_course_keys`, `category_overrides` and `custom_courses` as `jsonb`, plus `total_credits` and `visibility` (`public` \| `restricted`). |
+| `calendar_shares` | Allow-list backing `visibility = 'restricted'`: `(calendar_id, user_id)`. |
+| `course_ratings` | One row per `(user_id, course_key)`: `rating` (0–5), private `note`, `updated_at`. |
 | `course_comments` | One row per discussion message: `calendar_id`, `course_key`, `author_id`, `author_name`, `body`, `created_at`. |
+| `schema_migrations` | Bookkeeping so one-shot data migrations run exactly once. |
 
-Deleting a user cascades to their calendars; deleting a calendar cascades to its discussions.
+Deleting a user cascades to their calendars, ratings and shares; deleting a calendar cascades to its
+discussions and its allow-list.
+
+### Migration from calendar-scoped ratings
+
+Ratings and notes used to live in `calendars.ratings` / `calendars.notes`, which meant everybody who
+opened a calendar inherited — and could overwrite — its author's ratings. On first boot after the
+upgrade, `migrate()` lifts every rating and note of an *owned* calendar into `course_ratings`,
+attributed to that owner. When somebody owns several calendars touching the same course, the star and
+the note are each taken from the most recent calendar that actually has one, so nothing is dropped.
+The old `jsonb` columns are deliberately left in place as a safety net, and the migration is recorded
+in `schema_migrations` so it never runs twice. Existing calendars become `visibility = 'public'`,
+which is exactly how they behaved before.
 
 ---
 
@@ -224,13 +254,21 @@ All endpoints are under `/api` and return JSON. Errors use `{ "error": "message 
 | `POST` | `/api/auth/logout` | — | Clear the session cookie. |
 | `GET` | `/api/auth/me` | — | Current user, or `null`. |
 | `PATCH` | `/api/auth/me` | ✅ | Rename the account (propagates to owned calendars). |
-| `GET` | `/api/calendars` | — | Public list of calendar summaries. |
-| `GET` | `/api/calendars/:id` | — | Full calendar. |
-| `POST` | `/api/calendars` | ✅ | Create and publish a calendar. |
+| `GET` | `/api/users` | — | Profile directory. `?q=` matches a name or an `@handle`. |
+| `GET` | `/api/users/:idOrHandle` | — | One profile, addressable by uuid or `@handle`. |
+| `GET` | `/api/users/:id/ratings` | — | Their rated courses. Note text only for its author. |
+| `GET` | `/api/ratings/me` | ✅ | Your own ratings and private notes. |
+| `PUT` | `/api/ratings/me/:courseKey` | ✅ | Upsert one rating/note; empty values delete it. |
+| `POST` | `/api/ratings/me/import` | ✅ | Merge `localStorage` ratings in; existing rows win. |
+| `GET` | `/api/calendars` | — | Calendars visible to the caller. `?owner=<uuid>` narrows to one profile. |
+| `GET` | `/api/calendars/:id` | access | Full calendar (404 when not visible to the caller). |
+| `POST` | `/api/calendars` | ✅ | Create a calendar. |
 | `PATCH` | `/api/calendars/:id` | owner | Update a calendar. |
 | `DELETE` | `/api/calendars/:id` | owner | Delete a calendar and its discussions. |
-| `GET` | `/api/calendars/:id/comments` | — | All threads, grouped by course key. |
-| `POST` | `/api/calendars/:id/comments` | ✅ | Post a message on one course. |
+| `GET` | `/api/calendars/:id/shares` | owner | Current visibility and allow-list. |
+| `PUT` | `/api/calendars/:id/shares` | owner | Set visibility and replace the allow-list. |
+| `GET` | `/api/calendars/:id/comments` | access | All threads, grouped by course key. |
+| `POST` | `/api/calendars/:id/comments` | ✅ + access | Post a message on one course. |
 | `DELETE` | `/api/calendars/:id/comments/:commentId` | author or calendar owner | Delete a message. |
 
 ---

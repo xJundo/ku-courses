@@ -108,6 +108,39 @@ export interface AuthUser {
   id: string;
   email: string;
   displayName: string;
+  /** Public `@` identifier, used for mentions and profile URLs. */
+  handle: string;
+}
+
+/** Public view of an account, as listed in the profile directory. */
+export interface Profile {
+  id: string;
+  displayName: string;
+  handle: string;
+  createdAt: string;
+  isSelf: boolean;
+  calendarCount: number;
+  ratingCount: number;
+  lastActiveAt: string;
+}
+
+/** One course rated by a profile. `note` is only filled in for its author. */
+export interface ProfileRating {
+  courseKey: string;
+  rating: number;
+  note: string;
+  hasNote: boolean;
+  updatedAt: string;
+}
+
+/** Who a calendar is readable by: everybody, or an explicit allow-list. */
+export type CalendarVisibility = 'public' | 'restricted';
+
+/** A profile that has been granted access to a restricted calendar. */
+export interface SharedUser {
+  id: string;
+  displayName: string;
+  handle: string;
 }
 
 /** Row shown in the community list. */
@@ -116,35 +149,43 @@ export interface CalendarSummary {
   name: string;
   author: string;
   ownerId: string | null;
+  ownerHandle: string | null;
   isOwner: boolean;
+  visibility: CalendarVisibility;
   description: string;
   createdAt: string;
   updatedAt: string;
   courseCount: number;
   totalCredits: number;
   commentCount: number;
+  sharedCount: number;
 }
 
 /**
- * `notes` holds the owner's private per-course notes (previously `comments`).
- * Public discussion lives in `CourseComment` threads instead.
+ * `authorRatings` are the owner's own star ratings, shown read-only to
+ * visitors — ratings belong to a profile, never to a calendar. Private
+ * per-course notes are not part of this payload at all; public discussion
+ * lives in `CourseComment` threads instead.
  */
 export interface CommunityCalendar {
   id: string;
   name: string;
   author: string;
   ownerId: string | null;
+  ownerHandle: string | null;
   isOwner: boolean;
+  visibility: CalendarVisibility;
   description: string;
   createdAt: string;
   updatedAt: string;
   selectedCourseKeys: string[];
   categoryOverrides: Record<string, Category>;
-  ratings: Record<string, number>;
-  notes: Record<string, string>;
+  authorRatings: Record<string, number>;
   customCourses: Course[];
   courseCount: number;
   totalCredits: number;
+  sharedWith: SharedUser[];
+  sharedCount: number;
 }
 
 /** One message in a per-course discussion thread. */

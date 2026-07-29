@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { CalendarPlusIcon } from 'lucide-react';
+import { CalendarPlusIcon, GlobeIcon, LockIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -15,12 +15,18 @@ import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import type { CalendarVisibility } from '@/types/course';
 
 interface CreateCalendarDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currentCourseCount: number;
-  onCreate: (name: string, description: string, copyCurrent: boolean) => Promise<unknown>;
+  onCreate: (
+    name: string,
+    description: string,
+    copyCurrent: boolean,
+    visibility: CalendarVisibility
+  ) => Promise<unknown>;
 }
 
 export function CreateCalendarDialog({
@@ -32,6 +38,7 @@ export function CreateCalendarDialog({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [copyCurrent, setCopyCurrent] = useState(true);
+  const [isPublic, setIsPublic] = useState(true);
   const [pending, setPending] = useState(false);
 
   const handleSubmit = async (event: FormEvent) => {
@@ -39,7 +46,12 @@ export function CreateCalendarDialog({
     if (!name.trim()) return;
 
     setPending(true);
-    const created = await onCreate(name.trim(), description.trim(), copyCurrent);
+    const created = await onCreate(
+      name.trim(),
+      description.trim(),
+      copyCurrent,
+      isPublic ? 'public' : 'restricted'
+    );
     setPending(false);
 
     if (created) {
@@ -58,9 +70,8 @@ export function CreateCalendarDialog({
             Nouveau calendrier
           </DialogTitle>
           <DialogDescription>
-            Il sera publié immédiatement dans les calendriers communautaires. Vous seul pouvez le
-            modifier ; les autres étudiants peuvent le consulter, le dupliquer et commenter ses
-            cours.
+            Vous seul pouvez le modifier ; les personnes qui y ont accès peuvent le consulter, le
+            dupliquer et commenter ses cours.
           </DialogDescription>
         </DialogHeader>
 
@@ -94,6 +105,23 @@ export function CreateCalendarDialog({
             </Field>
 
             <Field orientation="horizontal">
+              <Switch id="calendar-public" checked={isPublic} onCheckedChange={setIsPublic} />
+              <div className="flex flex-col gap-0.5">
+                <FieldTitle>
+                  <FieldLabel htmlFor="calendar-public" className="gap-1.5">
+                    {isPublic ? <GlobeIcon className="size-4" /> : <LockIcon className="size-4" />}
+                    Visible par tout le monde
+                  </FieldLabel>
+                </FieldTitle>
+                <FieldDescription>
+                  {isPublic
+                    ? 'Publié dans les calendriers communautaires.'
+                    : 'Privé : vous choisirez ensuite les profils autorisés via « Accès ».'}
+                </FieldDescription>
+              </div>
+            </Field>
+
+            <Field orientation="horizontal">
               <Switch id="copy-current" checked={copyCurrent} onCheckedChange={setCopyCurrent} />
               <div className="flex flex-col gap-0.5">
                 <FieldTitle>
@@ -115,7 +143,7 @@ export function CreateCalendarDialog({
           </Button>
           <Button type="submit" form="create-calendar-form" disabled={pending || !name.trim()}>
             {pending ? <Spinner data-icon="inline-start" /> : <CalendarPlusIcon data-icon="inline-start" />}
-            Créer & publier
+            Créer le calendrier
           </Button>
         </DialogFooter>
       </DialogContent>

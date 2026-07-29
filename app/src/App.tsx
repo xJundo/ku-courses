@@ -76,6 +76,10 @@ export default function App() {
             setShowClosedExchange={data.setShowClosedExchange}
             showOnlyEnglish={data.showOnlyEnglish}
             setShowOnlyEnglish={data.setShowOnlyEnglish}
+            showOnlyWithoutConflict={data.showOnlyWithoutConflict}
+            setShowOnlyWithoutConflict={data.setShowOnlyWithoutConflict}
+            hideThursdayFriday={data.hideThursdayFriday}
+            setHideThursdayFriday={data.setHideThursdayFriday}
             onToggleCourse={data.toggleCourse}
             onCycleCategory={data.cycleCategory}
             onSetRating={data.handleSetRating}

@@ -49,6 +49,8 @@ export function useCoursesData() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showClosedExchange, setShowClosedExchange] = useState(false);
   const [showOnlyEnglish, setShowOnlyEnglish] = useState(true);
+  const [showOnlyWithoutConflict, setShowOnlyWithoutConflict] = useState(false);
+  const [hideThursdayFriday, setHideThursdayFriday] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
   const [sortBy, setSortBy] = useState<SortOption>('default');
   const [jsonError, setJsonError] = useState<string | null>(null);
@@ -347,6 +349,20 @@ export function useCoursesData() {
   const filteredCoursesList = useMemo(() => {
     const term = searchTerm.toLowerCase();
 
+    const selectedKeySet = new Set(selectedCourses.map(courseKey));
+    const slotCourseCount = new Map<string, number>();
+    if (showOnlyWithoutConflict) {
+      for (const selected of selectedCourses) {
+        if (selected.isOnline) continue;
+        for (const sched of selected.parsedSchedules) {
+          for (const p of sched.periods) {
+            const slotKey = `${sched.day}-${p}`;
+            slotCourseCount.set(slotKey, (slotCourseCount.get(slotKey) || 0) + 1);
+          }
+        }
+      }
+    }
+
     const filtered = coursesWithSchedules.filter(course => {
       const matchesSearch =
         course.COUR_NM.toLowerCase().includes(term) ||
@@ -364,7 +380,39 @@ export function useCoursesData() {
       const matchesExchange = showClosedExchange || course.openToExchange;
       const matchesEnglish = !showOnlyEnglish || course.isEnglish;
 
-      return matchesSearch && matchesTab && matchesExchange && matchesEnglish;
+      let matchesConflict = true;
+      if (showOnlyWithoutConflict) {
+        if (!course.isOnline && course.parsedSchedules.length > 0) {
+          const isSelected = selectedKeySet.has(courseKey(course));
+          for (const sched of course.parsedSchedules) {
+            for (const p of sched.periods) {
+              const slotKey = `${sched.day}-${p}`;
+              const count = slotCourseCount.get(slotKey) || 0;
+              if (isSelected ? count > 1 : count > 0) {
+                matchesConflict = false;
+                break;
+              }
+            }
+            if (!matchesConflict) break;
+          }
+        }
+      }
+
+      let matchesThuFri = true;
+      if (hideThursdayFriday) {
+        if (course.parsedSchedules.some(sched => sched.day === 'Thu' || sched.day === 'Fri')) {
+          matchesThuFri = false;
+        }
+      }
+
+      return (
+        matchesSearch &&
+        matchesTab &&
+        matchesExchange &&
+        matchesEnglish &&
+        matchesConflict &&
+        matchesThuFri
+      );
     });
 
     return [...filtered].sort((a, b) => {
@@ -380,7 +428,17 @@ export function useCoursesData() {
       if (sortBy === 'name') return a.COUR_NM.localeCompare(b.COUR_NM);
       return 0;
     });
-  }, [coursesWithSchedules, searchTerm, activeTab, showClosedExchange, showOnlyEnglish, sortBy]);
+  }, [
+    coursesWithSchedules,
+    searchTerm,
+    activeTab,
+    showClosedExchange,
+    showOnlyEnglish,
+    showOnlyWithoutConflict,
+    hideThursdayFriday,
+    selectedCourses,
+    sortBy
+  ]);
 
   const toggleCourse = useCallback((course: ProcessedCourse) => {
     setSelectedCourses(prev =>
@@ -469,6 +527,10 @@ export function useCoursesData() {
     setShowClosedExchange,
     showOnlyEnglish,
     setShowOnlyEnglish,
+    showOnlyWithoutConflict,
+    setShowOnlyWithoutConflict,
+    hideThursdayFriday,
+    setHideThursdayFriday,
     activeTab,
     setActiveTab,
     sortBy,

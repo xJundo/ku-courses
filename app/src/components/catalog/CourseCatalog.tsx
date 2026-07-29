@@ -49,6 +49,10 @@ interface CourseCatalogProps {
   setShowClosedExchange: (show: boolean) => void;
   showOnlyEnglish: boolean;
   setShowOnlyEnglish: (show: boolean) => void;
+  showOnlyWithoutConflict: boolean;
+  setShowOnlyWithoutConflict: (show: boolean) => void;
+  hideThursdayFriday: boolean;
+  setHideThursdayFriday: (hide: boolean) => void;
   onToggleCourse: (course: ProcessedCourse) => void;
   onCycleCategory: (course: ProcessedCourse) => void;
   onSetRating: (course: ProcessedCourse, rating: number) => void;
@@ -70,6 +74,10 @@ export function CourseCatalog({
   setShowClosedExchange,
   showOnlyEnglish,
   setShowOnlyEnglish,
+  showOnlyWithoutConflict,
+  setShowOnlyWithoutConflict,
+  hideThursdayFriday,
+  setHideThursdayFriday,
   onToggleCourse,
   onCycleCategory,
   onSetRating,
@@ -163,7 +171,7 @@ export function CourseCatalog({
           </Field>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="flex items-center gap-2">
             <Switch
               id="show-closed"
@@ -182,6 +190,26 @@ export function CourseCatalog({
             />
             <Label htmlFor="only-english" className="text-xs font-normal">
               Cours en anglais uniquement 🇬🇧
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="without-conflict"
+              checked={showOnlyWithoutConflict}
+              onCheckedChange={setShowOnlyWithoutConflict}
+            />
+            <Label htmlFor="without-conflict" className="text-xs font-normal">
+              Cours compatible avec mon emploi du temps uniquement 📅
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="hide-thu-fri"
+              checked={hideThursdayFriday}
+              onCheckedChange={setHideThursdayFriday}
+            />
+            <Label htmlFor="hide-thu-fri" className="text-xs font-normal">
+              Masquer les cours du jeudi & vendredi 🚫
             </Label>
           </div>
         </div>

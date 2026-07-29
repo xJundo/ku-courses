@@ -189,8 +189,8 @@ export function CourseDetailsDialog({
             <CourseDiscussion
               courseKey={key}
               comments={comments}
-              calendarId={calendarId}
-              calendarName={calendarName}
+              threadId={calendarId}
+              contextLabel={calendarName}
               onSend={onSendComment}
               onDelete={onDeleteComment}
               onRequireAuth={onRequireAuth}

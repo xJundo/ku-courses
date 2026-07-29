@@ -71,6 +71,7 @@ export default function App() {
           activeCalendarId={data.activeCalendarId}
           onOpenCalendar={openCalendarInPlanner}
           onManageAccess={setAccessCalendar}
+          onRequireAuth={() => requireAuth('Connectez-vous pour participer à la discussion.')}
           findCourse={key => coursesByKey.get(key)}
         />
       ) : (

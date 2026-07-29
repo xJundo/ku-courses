@@ -35,9 +35,17 @@ function formatDate(iso: string) {
 interface CourseDiscussionProps {
   courseKey: string;
   comments: CourseComment[];
-  /** Null when no community calendar is currently loaded. */
-  calendarId: string | null;
-  calendarName?: string;
+  /**
+   * Whatever the thread hangs off — a calendar in the planner, a profile on a
+   * profile page. `null` means there is nothing to discuss yet, and
+   * `unavailable` is rendered instead.
+   */
+  threadId: string | null;
+  unavailable?: { title: string; description: string };
+  /** Appended to the heading, e.g. the calendar or profile the thread is on. */
+  contextLabel?: string;
+  heading?: string;
+  placeholder?: string;
   onSend: (courseKey: string, body: string) => Promise<void>;
   onDelete: (courseKey: string, commentId: string) => Promise<void>;
   onRequireAuth: () => void;
@@ -46,8 +54,11 @@ interface CourseDiscussionProps {
 export function CourseDiscussion({
   courseKey,
   comments,
-  calendarId,
-  calendarName,
+  threadId,
+  unavailable,
+  contextLabel,
+  heading = 'Discussion sur ce cours',
+  placeholder = 'Votre message sur ce cours…',
   onSend,
   onDelete,
   onRequireAuth
@@ -56,16 +67,17 @@ export function CourseDiscussion({
   const [body, setBody] = useState('');
   const [pending, setPending] = useState(false);
 
-  if (!calendarId) {
+  if (!threadId) {
     return (
       <Empty className="border-border rounded-lg border border-dashed py-6">
         <EmptyHeader>
           <EmptyMedia variant="icon">
             <MessagesSquareIcon />
           </EmptyMedia>
-          <EmptyTitle>Aucune discussion active</EmptyTitle>
+          <EmptyTitle>{unavailable?.title ?? 'Aucune discussion active'}</EmptyTitle>
           <EmptyDescription>
-            Ouvrez un calendrier communautaire pour discuter de ce cours avec son auteur.
+            {unavailable?.description ??
+              'Ouvrez un calendrier communautaire pour discuter de ce cours avec son auteur.'}
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
@@ -106,8 +118,8 @@ export function CourseDiscussion({
       <div className="text-muted-foreground flex items-center gap-2 text-xs">
         <MessagesSquareIcon className="size-4" />
         <span>
-          Discussion sur ce cours
-          {calendarName ? ` · ${calendarName}` : ''} ({comments.length})
+          {heading}
+          {contextLabel ? ` · ${contextLabel}` : ''} ({comments.length})
         </span>
       </div>
 
@@ -155,11 +167,7 @@ export function CourseDiscussion({
           value={body}
           maxLength={MAX_LENGTH}
           onChange={event => setBody(event.target.value)}
-          placeholder={
-            user
-              ? 'Votre message sur ce cours…'
-              : 'Connectez-vous pour participer à la discussion.'
-          }
+          placeholder={user ? placeholder : 'Connectez-vous pour participer à la discussion.'}
           disabled={!user}
           className="min-h-20 resize-none text-xs"
         />

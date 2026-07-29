@@ -46,7 +46,9 @@ calendars and per-course discussion threads.
 - **`/profils`** lists every account (calendars published, courses rated, sign-up date) with a search
   box that accepts a name or an `@handle`.
 - **`/profils/@handle`** shows one profile: the calendars you are allowed to see, and every course
-  they rated. E-mail addresses are never part of a profile payload.
+  they rated — stars **and** notes, readable by everybody but editable only by their author.
+- Each rating carries its **own discussion thread**, so you can reply to somebody's note the same
+  way you comment a course inside a calendar. E-mail addresses are never part of a profile payload.
 
 ### 🔒 Community calendars & access control
 - Each calendar is either **public** (listed for everyone, openable by link) or **restricted** to an
@@ -58,7 +60,7 @@ calendars and per-course discussion threads.
 
 ### 💬 Per-course discussions
 - Each course inside a calendar carries its own **discussion thread** — a mini chat between the
-  calendar's owner and other students.
+  calendar's owner and other students. Ratings on a profile page get the same treatment.
 - Any signed-in user can post. A message can be removed by **its author** or by the
   **calendar owner** acting as moderator of their own thread.
 - Message counts surface on the course cards, in the timetable cells and in the community list.
@@ -80,7 +82,8 @@ calendars and per-course discussion threads.
 - 1-to-5-star ratings and private per-course notes, **owned by your profile** rather than by the
   calendar you happen to have open. Opening someone else's calendar never touches your own ratings.
   Ratings made while signed out live in `localStorage` and are imported into the first account that
-  signs in on that browser. Stars are public on your profile page; the free-text notes stay private.
+  signs in on that browser. Stars and notes are both public on your profile page, read-only for
+  everybody else.
 
 ### ➕ Custom courses & category overrides
 - Add personal commitments or external lectures with custom time slots.
@@ -223,11 +226,12 @@ To add a shadcn component: `npx shadcn@latest add <component>`.
 | `calendars` | Owned by a user (`owner_id`, nullable for legacy imports). Holds `selected_course_keys`, `category_overrides` and `custom_courses` as `jsonb`, plus `total_credits` and `visibility` (`public` \| `restricted`). |
 | `calendar_shares` | Allow-list backing `visibility = 'restricted'`: `(calendar_id, user_id)`. |
 | `course_ratings` | One row per `(user_id, course_key)`: `rating` (0–5), private `note`, `updated_at`. |
-| `course_comments` | One row per discussion message: `calendar_id`, `course_key`, `author_id`, `author_name`, `body`, `created_at`. |
+| `course_comments` | One row per discussion message on a calendar's course: `calendar_id`, `course_key`, `author_id`, `author_name`, `body`, `created_at`. |
+| `rating_comments` | Same, for the thread on a profile's rating: `profile_id`, `course_key`, author fields, `body`, `created_at`. |
 | `schema_migrations` | Bookkeeping so one-shot data migrations run exactly once. |
 
-Deleting a user cascades to their calendars, ratings and shares; deleting a calendar cascades to its
-discussions and its allow-list.
+Deleting a user cascades to their calendars, ratings, shares and rating threads; deleting a calendar
+cascades to its discussions and its allow-list.
 
 ### Migration from calendar-scoped ratings
 
@@ -256,7 +260,10 @@ All endpoints are under `/api` and return JSON. Errors use `{ "error": "message 
 | `PATCH` | `/api/auth/me` | ✅ | Rename the account (propagates to owned calendars). |
 | `GET` | `/api/users` | — | Profile directory. `?q=` matches a name or an `@handle`. |
 | `GET` | `/api/users/:idOrHandle` | — | One profile, addressable by uuid or `@handle`. |
-| `GET` | `/api/users/:id/ratings` | — | Their rated courses. Note text only for its author. |
+| `GET` | `/api/users/:id/ratings` | — | Their rated courses: star, note and message count. |
+| `GET` | `/api/users/:id/comments` | — | Threads on their ratings, grouped by course key. |
+| `POST` | `/api/users/:id/comments` | ✅ | Reply to one of their ratings. |
+| `DELETE` | `/api/users/:id/comments/:commentId` | author or rated profile | Delete a message. |
 | `GET` | `/api/ratings/me` | ✅ | Your own ratings and private notes. |
 | `PUT` | `/api/ratings/me/:courseKey` | ✅ | Upsert one rating/note; empty values delete it. |
 | `POST` | `/api/ratings/me/import` | ✅ | Merge `localStorage` ratings in; existing rows win. |

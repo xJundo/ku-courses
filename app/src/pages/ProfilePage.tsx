@@ -3,6 +3,8 @@ import {
   ArrowLeftIcon,
   AtSignIcon,
   CalendarIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   ClockIcon,
   DownloadIcon,
   GlobeIcon,
@@ -14,6 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StarRating } from '@/components/common/StarRating';
+import { CourseDiscussion } from '@/components/discussion/CourseDiscussion';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,6 +24,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useProfileDiscussions } from '@/hooks/useProfileDiscussions';
 import { navigate, routes } from '@/hooks/useRouter';
 import { ApiError, calendarApi, userApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -33,6 +37,7 @@ interface ProfilePageProps {
   activeCalendarId: string | null;
   onOpenCalendar: (id: string) => void;
   onManageAccess: (calendar: CalendarSummary) => void;
+  onRequireAuth: () => void;
   /** Resolves a course key against the loaded catalog, when it is known. */
   findCourse: (courseKey: string) => ProcessedCourse | undefined;
 }
@@ -51,6 +56,7 @@ export function ProfilePage({
   activeCalendarId,
   onOpenCalendar,
   onManageAccess,
+  onRequireAuth,
   findCourse
 }: ProfilePageProps) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -58,11 +64,16 @@ export function ProfilePage({
   const [ratings, setRatings] = useState<ProfileRating[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  /** Only one thread is expanded at a time, to keep the list readable. */
+  const [openThread, setOpenThread] = useState<string | null>(null);
+
+  const discussions = useProfileDiscussions(profile?.id ?? null);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setNotFound(false);
+    setOpenThread(null);
 
     const load = async () => {
       try {
@@ -261,27 +272,67 @@ export function ProfilePage({
             <div className="flex flex-col rounded-lg border">
               {ratings.map((entry, index) => {
                 const course = findCourse(entry.courseKey);
+                const thread = discussions.threads[entry.courseKey] ?? [];
+                const expanded = openThread === entry.courseKey;
+                // The count from the initial load goes stale as soon as this
+                // visitor posts, so prefer the live thread once it is loaded.
+                const count = thread.length || entry.commentCount;
+
                 return (
                   <div key={entry.courseKey}>
                     {index > 0 && <Separator />}
-                    <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex min-w-0 flex-col">
-                        <span className="truncate text-sm font-medium">
-                          {course?.COUR_NM || entry.courseKey}
-                        </span>
-                        <span className="text-muted-foreground truncate text-xs">
-                          {course ? `${course.COUR_CD} · ${course.PROF_NM}` : 'Cours hors catalogue'}
-                        </span>
-                        {entry.note && (
-                          <p className="text-muted-foreground mt-1 text-xs italic">{entry.note}</p>
-                        )}
+                    <div className="flex flex-col gap-2 p-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate text-sm font-medium">
+                            {course?.COUR_NM || entry.courseKey}
+                          </span>
+                          <span className="text-muted-foreground truncate text-xs">
+                            {course ? `${course.COUR_CD} · ${course.PROF_NM}` : 'Cours hors catalogue'}
+                          </span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <StarRating rating={entry.rating} interactive={false} />
+                        </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        {entry.hasNote && !entry.note && (
-                          <span className="text-muted-foreground text-xs">note privée</span>
+
+                      {entry.note && (
+                        <blockquote className="border-muted-foreground/30 text-muted-foreground border-l-2 pl-3 text-xs leading-relaxed whitespace-pre-wrap">
+                          {entry.note}
+                        </blockquote>
+                      )}
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="self-start"
+                        aria-expanded={expanded}
+                        onClick={() => setOpenThread(expanded ? null : entry.courseKey)}
+                      >
+                        <MessagesSquareIcon data-icon="inline-start" />
+                        {count > 0 ? `${count} message(s)` : 'Discuter'}
+                        {expanded ? (
+                          <ChevronUpIcon data-icon="inline-end" />
+                        ) : (
+                          <ChevronDownIcon data-icon="inline-end" />
                         )}
-                        <StarRating rating={entry.rating} interactive={false} />
-                      </div>
+                      </Button>
+
+                      {expanded && (
+                        <div className="border-t pt-3">
+                          <CourseDiscussion
+                            courseKey={entry.courseKey}
+                            comments={thread}
+                            threadId={profile.id}
+                            heading="Discussion sur cette note"
+                            contextLabel={`@${profile.handle}`}
+                            placeholder={`Votre réponse à la note de ${profile.displayName}…`}
+                            onSend={discussions.addComment}
+                            onDelete={discussions.removeComment}
+                            onRequireAuth={onRequireAuth}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

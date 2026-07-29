@@ -140,7 +140,19 @@ export const userApi = {
   get: (idOrHandle: string) =>
     request<{ profile: Profile }>(`/users/${encodeURIComponent(idOrHandle.replace(/^@+/, ''))}`),
 
-  ratings: (id: string) => request<{ ratings: ProfileRating[] }>(`/users/${id}/ratings`)
+  ratings: (id: string) => request<{ ratings: ProfileRating[] }>(`/users/${id}/ratings`),
+
+  /** Discussion threads on this profile's ratings, grouped by course key. */
+  listComments: (id: string) => request<{ threads: CommentThreads }>(`/users/${id}/comments`),
+
+  addComment: (id: string, courseKey: string, body: string) =>
+    request<{ comment: CourseComment }>(`/users/${id}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ courseKey, body })
+    }),
+
+  removeComment: (id: string, commentId: string) =>
+    request<{ ok: true }>(`/users/${id}/comments/${commentId}`, { method: 'DELETE' })
 };
 
 export const ratingApi = {

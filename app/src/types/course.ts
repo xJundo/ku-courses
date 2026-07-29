@@ -124,12 +124,15 @@ export interface Profile {
   lastActiveAt: string;
 }
 
-/** One course rated by a profile. `note` is only filled in for its author. */
+/**
+ * One course rated by a profile. Both the star and the note are readable by
+ * everybody; only their author can change them.
+ */
 export interface ProfileRating {
   courseKey: string;
   rating: number;
   note: string;
-  hasNote: boolean;
+  commentCount: number;
   updatedAt: string;
 }
 

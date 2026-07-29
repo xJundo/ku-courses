@@ -108,6 +108,22 @@ CREATE TABLE IF NOT EXISTS course_ratings (
 
 CREATE INDEX IF NOT EXISTS course_ratings_user_idx ON course_ratings (user_id, updated_at DESC);
 
+-- One discussion thread per rating, i.e. per (profile, course) pair — the
+-- profile-page counterpart of course_comments. Anybody signed in can reply;
+-- only the message author or the rated profile can delete.
+CREATE TABLE IF NOT EXISTS rating_comments (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_id  uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  course_key  text NOT NULL,
+  author_id   uuid REFERENCES users(id) ON DELETE SET NULL,
+  author_name text NOT NULL,
+  body        text NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS rating_comments_thread_idx
+  ON rating_comments (profile_id, course_key, created_at);
+
 -- Explicit allow-list backing calendars whose visibility is 'restricted'.
 CREATE TABLE IF NOT EXISTS calendar_shares (
   calendar_id uuid NOT NULL REFERENCES calendars(id) ON DELETE CASCADE,

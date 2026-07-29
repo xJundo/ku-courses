@@ -199,7 +199,7 @@ export function CourseCatalog({
               onCheckedChange={setShowOnlyWithoutConflict}
             />
             <Label htmlFor="without-conflict" className="text-xs font-normal">
-              Cours compatible avec mon emploi du temps uniquement 📅
+              Cours compatible avec mon emploi du temps uniquement
             </Label>
           </div>
           <div className="flex items-center gap-2">
@@ -209,7 +209,7 @@ export function CourseCatalog({
               onCheckedChange={setHideThursdayFriday}
             />
             <Label htmlFor="hide-thu-fri" className="text-xs font-normal">
-              Masquer les cours du jeudi & vendredi 🚫
+              Masquer les cours du jeudi & vendredi
             </Label>
           </div>
         </div>
